@@ -84,9 +84,9 @@ describe('drag events', () => {
 })
 
 describe('the sensor seam', () => {
-  it('gives a sensor exactly move / end / cancel plus directional targeting', () => {
+  it('gives a sensor exactly move / end / cancel, plus liveness and directional targeting', () => {
     expectTypeOf<keyof DragSession>().toEqualTypeOf<
-      'move' | 'end' | 'cancel' | 'findTargetInDirection'
+      'isActive' | 'move' | 'end' | 'cancel' | 'findTargetInDirection'
     >()
   })
 

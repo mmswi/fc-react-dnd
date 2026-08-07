@@ -45,6 +45,10 @@
     "./pointer-sensor": {
       "types": "./dist/pointer-sensor.d.ts",
       "default": "./dist/pointer-sensor.js"
+    },
+    "./keyboard-sensor": {
+      "types": "./dist/keyboard-sensor.d.ts",
+      "default": "./dist/keyboard-sensor.js"
     }
   },
   "scripts": {

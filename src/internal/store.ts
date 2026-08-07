@@ -298,6 +298,7 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
     const isCurrent = (): boolean => token === sessionToken
 
     return {
+      isActive: () => isCurrent() && state.origin !== null,
       move: (translate) => {
         if (isCurrent()) applyUpdate(translate, true)
       },

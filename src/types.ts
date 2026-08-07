@@ -167,6 +167,14 @@ export type DirectionalTarget = {
  * late listener firing after `end` cannot resurrect a finished drag.
  */
 export type DragSession = {
+  /**
+   * Whether this session is still the live one.
+   *
+   * A drag can end without the sensor being told: the store cancels when a registered node
+   * disappears (§ A6), and the keyboard path has no trailing event that would reveal it. A
+   * sensor that goes on believing a drag is running swallows the user's next pickup.
+   */
+  readonly isActive: () => boolean
   readonly move: (translate: Translate) => void
   readonly end: () => void
   readonly cancel: (reason: DragCancelReason) => void

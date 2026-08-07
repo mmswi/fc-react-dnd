@@ -61,7 +61,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 ## P5 — Sensors
 
 - [x] [T5.1](tasks/T5.1-pointer-sensor.md) — `src/pointer-sensor.ts` + tests
-- [ ] [T5.2](tasks/T5.2-keyboard-sensor.md) — `src/keyboard-sensor.ts` + tests
+- [x] [T5.2](tasks/T5.2-keyboard-sensor.md) — `src/keyboard-sensor.ts` + tests
 
 ## P6 — Overlay, auto-scroll, accessibility
 
@@ -119,6 +119,11 @@ No task files — promote an entry to a task (TOC line + file) before coding it.
 - Additional collision strategies (`rectIntersection`, `pointerWithin`)
 - Drop animation for `DragOverlay` (animate to final/origin rect)
 - `portalContainer` prop for overlay + live region
+- Keyboard navigation for a **horizontal** `SortableList`: ArrowLeft/ArrowRight are the depth
+  step (T5.2), so a horizontal list steps by `indentPx` rather than target-to-target. Needs an
+  axis-aware sensor option or a list-direction-aware targeting query — not a layout-dependent
+  "target if one is there, otherwise indent" rule, which breaks on tree rows whose centres are
+  offset by indentation
 - RTL-aware keyboard direction + tree depth direction
 - Touch long-press activation recipes; multi-pointer strategies
 - Virtualized-list integration recipe

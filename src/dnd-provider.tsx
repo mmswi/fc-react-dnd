@@ -5,6 +5,8 @@ import { closestCenter } from './collision.js'
 import { DndContext, type DndContextValue } from './internal/context.js'
 import { DragInstructions } from './internal/live-region.js'
 import { createDragStore } from './internal/store.js'
+import { keyboardSensor } from './keyboard-sensor.js'
+import { pointerSensor } from './pointer-sensor.js'
 import type {
   CollisionDetection,
   DndAccessibility,
@@ -32,12 +34,18 @@ const DEFAULT_INSTRUCTIONS =
 const DEFAULT_ROLE_DESCRIPTION = 'draggable'
 
 /**
- * Module-level and frozen, so the default is referentially stable for every consumer who does
- * not customise it. A consumer who *does* pass `sensors` owns keeping that array stable — an
- * inline literal re-renders the whole subtree on every parent render, because the context
- * value depends on it (`ANALYSIS.md` § A3.5).
+ * Both sensors, constructed once at module level so the default is referentially stable for
+ * every consumer who does not customise it.
+ *
+ * Defaulting means this module imports both sensors, which a bundle-size-sensitive library
+ * would refuse. Bundle size is explicitly not a concern here, and a provider that silently does
+ * nothing until you discover the `sensors` prop is the worse trade (`ANALYSIS.md` § A9.5).
+ *
+ * A consumer who *does* pass `sensors` owns keeping that array stable — an inline literal
+ * re-renders the whole subtree on every parent render, because the context value depends on it
+ * (§ A3.5).
  */
-const NO_SENSORS: readonly Sensor[] = Object.freeze([])
+const DEFAULT_SENSORS: readonly Sensor[] = Object.freeze([pointerSensor(), keyboardSensor()])
 
 export type DndProviderProps = {
   children: ReactNode
@@ -54,7 +62,7 @@ export type DndProviderProps = {
 
 export const DndProvider = ({
   children,
-  sensors = NO_SENSORS,
+  sensors = DEFAULT_SENSORS,
   collisionDetection = closestCenter,
   accessibility,
   onDragStart,
