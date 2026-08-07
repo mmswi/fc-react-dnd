@@ -1,7 +1,7 @@
 import { act, render } from '@testing-library/react'
 import { StrictMode, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { mockElementRect } from '../test/helpers.js'
+import { mockElementRect, nextFrame } from '../test/helpers.js'
 import { DndProvider } from './dnd-provider.js'
 import { useDndContext } from './internal/context.js'
 import type { DragStore } from './internal/store.js'
@@ -508,5 +508,68 @@ describe('the sensors prop', () => {
 
     expect(session).not.toBeNull()
     expect(readyStore.getState().origin?.id).toBe('item')
+  })
+})
+
+describe('the autoScroll prop', () => {
+  it('runs the scroll loop by default and not when switched off', async () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] })
+
+    const buildScene = (autoScroll: boolean) => {
+      const container = document.createElement('div')
+      container.style.overflow = 'auto'
+      mockElementRect(container, rectAt(0, 0, 400, 400))
+      for (const [property, value] of [
+        ['clientHeight', 400],
+        ['clientWidth', 400],
+        ['scrollHeight', 4000],
+        ['scrollWidth', 400],
+      ] as const) {
+        Object.defineProperty(container, property, { value, configurable: true })
+      }
+      Object.defineProperty(container, 'scrollTop', {
+        value: 0,
+        writable: true,
+        configurable: true,
+      })
+      document.body.append(container)
+
+      let store: DragStore | null = null
+      render(
+        <DndProvider autoScroll={autoScroll}>
+          <StoreProbe
+            onReady={(readyStore) => {
+              store = readyStore
+            }}
+          />
+        </DndProvider>,
+      )
+      const item = nodeAt(rectAt(0, 0))
+      container.append(item)
+      ;(store as unknown as DragStore).registerDraggable('item', item)
+      return { container, store: store as unknown as DragStore }
+    }
+
+    const enabled = buildScene(true)
+    act(() => {
+      enabled.store.beginDrag('item', { pointer: { x: 200, y: 395 } })
+    })
+    await act(async () => {
+      await nextFrame()
+      await nextFrame()
+    })
+    expect(enabled.container.scrollTop).toBeGreaterThan(0)
+
+    const disabled = buildScene(false)
+    act(() => {
+      disabled.store.beginDrag('item', { pointer: { x: 200, y: 395 } })
+    })
+    await act(async () => {
+      await nextFrame()
+      await nextFrame()
+    })
+    expect(disabled.container.scrollTop).toBe(0)
+
+    vi.useRealTimers()
   })
 })

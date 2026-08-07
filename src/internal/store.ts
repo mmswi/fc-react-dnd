@@ -110,6 +110,9 @@ export type DragStore = {
 
   addMonitor: (listeners: DndMonitorListeners) => () => void
 
+  /** The element the active drag started from — auto-scroll resolves its scroll container. */
+  getActiveNode: () => HTMLElement | null
+
   beginDrag: (id: DndId, init: DragBeginInit) => DragSession | null
   cancelActiveDrag: (reason: DragCancelReason) => void
   markRectsDirty: () => void
@@ -370,6 +373,12 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
     },
 
     getState: () => state,
+
+    getActiveNode: () => {
+      const activeId = state.origin?.id
+      if (activeId === undefined) return null
+      return draggables.get(activeId)?.node ?? null
+    },
 
     registerDraggable: (id, node) => {
       const existing = draggables.get(id)

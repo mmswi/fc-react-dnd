@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { closestCenter } from './collision.js'
+import { createAutoScroller } from './internal/auto-scroll.js'
 import { DndContext, type DndContextValue } from './internal/context.js'
 import { DragInstructions } from './internal/live-region.js'
 import { createDragStore } from './internal/store.js'
@@ -51,6 +52,8 @@ export type DndProviderProps = {
   children: ReactNode
   sensors?: readonly Sensor[]
   collisionDetection?: CollisionDetection
+  /** Scroll the nearest scrollable ancestor when a *pointer* drag nears its edge. */
+  autoScroll?: boolean
   accessibility?: DndAccessibility
 
   onDragStart?: (event: DragStartEvent) => void
@@ -64,6 +67,7 @@ export const DndProvider = ({
   children,
   sensors = DEFAULT_SENSORS,
   collisionDetection = closestCenter,
+  autoScroll = true,
   accessibility,
   onDragStart,
   onDragMove,
@@ -74,6 +78,7 @@ export const DndProvider = ({
   // `useState` with an initialiser rather than `useRef`, so the store is constructed exactly
   // once even under StrictMode's double-invoked render.
   const [store] = useState(() => createDragStore({ collisionDetection }))
+  const [autoScroller] = useState(() => createAutoScroller(store))
   const instructionsId = useId()
 
   const instructions = accessibility?.instructions ?? DEFAULT_INSTRUCTIONS
@@ -103,6 +108,23 @@ export const DndProvider = ({
   useEffect(() => {
     store.setCollisionDetection(collisionDetection)
   }, [store, collisionDetection])
+
+  useEffect(() => {
+    if (!autoScroll) return
+
+    const removeMonitor = store.addMonitor({
+      onDragStart: () => autoScroller.start(),
+      onDragEnd: () => autoScroller.stop(),
+      onDragCancel: () => autoScroller.stop(),
+    })
+
+    // Stopping in the cleanup covers the two cases the monitor cannot: the provider unmounting
+    // mid-drag, and `autoScroll` being turned off while a loop is running.
+    return () => {
+      removeMonitor()
+      autoScroller.stop()
+    }
+  }, [store, autoScroller, autoScroll])
 
   // Every dependency is either the store, a `useId` result, a plain string, or an array the
   // consumer owns — so nothing here churns on an ordinary parent re-render.

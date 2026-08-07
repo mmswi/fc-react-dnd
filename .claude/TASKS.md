@@ -66,7 +66,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 ## P6 — Overlay, auto-scroll, accessibility
 
 - [x] [T6.1](tasks/T6.1-drag-overlay.md) — `src/drag-overlay.tsx` + tests
-- [ ] [T6.2](tasks/T6.2-auto-scroll.md) — `src/internal/auto-scroll.ts` + tests
+- [x] [T6.2](tasks/T6.2-auto-scroll.md) — `src/internal/auto-scroll.ts` + tests
 - [ ] [T6.3](tasks/T6.3-accessibility-internals.md) — live region, announcements, instructions wiring + tests
 
 ## P7 — Sortable list
