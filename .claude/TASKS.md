@@ -53,7 +53,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 ## P4 — React API
 
 - [x] [T4.1](tasks/T4.1-dnd-provider.md) — `src/dnd-provider.tsx`
-- [ ] [T4.2](tasks/T4.2-use-draggable.md) — `src/use-draggable.ts`
+- [x] [T4.2](tasks/T4.2-use-draggable.md) — `src/use-draggable.ts`
 - [ ] [T4.3](tasks/T4.3-use-droppable.md) — `src/use-droppable.ts`
 - [ ] [T4.4](tasks/T4.4-use-active-drag-and-monitor.md) — `src/use-active-drag.ts` + `src/use-dnd-monitor.ts`
 - [ ] [T4.5](tasks/T4.5-react-api-component-tests.md) — component tests: lifecycle, granularity, StrictMode

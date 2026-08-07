@@ -25,6 +25,10 @@
     "./dnd-provider": {
       "types": "./dist/dnd-provider.d.ts",
       "default": "./dist/dnd-provider.js"
+    },
+    "./use-draggable": {
+      "types": "./dist/use-draggable.d.ts",
+      "default": "./dist/use-draggable.js"
     }
   },
   "scripts": {

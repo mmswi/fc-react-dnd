@@ -338,7 +338,15 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
   }
 
   const registerDroppableOfKind = (id: DndId, node: HTMLElement, kind: DroppableKind): void => {
-    droppables.set(id, { node, data: NO_DATA, disabled: false, kind })
+    // A node swap re-runs the ref callback, and the options effect has no changed dependency
+    // that would restore `data`/`disabled` afterwards — so carry them across.
+    const existing = droppables.get(id)
+    droppables.set(id, {
+      node,
+      data: existing?.data ?? NO_DATA,
+      disabled: existing?.disabled ?? false,
+      kind,
+    })
     onRegistrationAdded()
   }
 
@@ -358,7 +366,12 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
     getState: () => state,
 
     registerDraggable: (id, node) => {
-      draggables.set(id, { node, data: NO_DATA, disabled: false })
+      const existing = draggables.get(id)
+      draggables.set(id, {
+        node,
+        data: existing?.data ?? NO_DATA,
+        disabled: existing?.disabled ?? false,
+      })
       // A draggable is not measured or collided against, so its arrival changes no geometry.
       // Nothing to notify, and nothing to re-collide.
     },
