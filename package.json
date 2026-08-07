@@ -49,6 +49,10 @@
     "./keyboard-sensor": {
       "types": "./dist/keyboard-sensor.d.ts",
       "default": "./dist/keyboard-sensor.js"
+    },
+    "./drag-overlay": {
+      "types": "./dist/drag-overlay.d.ts",
+      "default": "./dist/drag-overlay.js"
     }
   },
   "scripts": {
