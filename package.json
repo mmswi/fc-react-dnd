@@ -29,6 +29,10 @@
     "./use-draggable": {
       "types": "./dist/use-draggable.d.ts",
       "default": "./dist/use-draggable.js"
+    },
+    "./use-droppable": {
+      "types": "./dist/use-droppable.d.ts",
+      "default": "./dist/use-droppable.js"
     }
   },
   "scripts": {

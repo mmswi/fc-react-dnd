@@ -347,7 +347,14 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
       disabled: existing?.disabled ?? false,
       kind,
     })
-    onRegistrationAdded()
+
+    // Re-registering the *same* node changes no geometry, and treating it as an arrival would
+    // be expensive and wrong: a consumer's inline `ref={(node) => …}` is a new function every
+    // render, so React re-attaches it on every render — including the per-move re-renders
+    // during a drag. Re-measuring and notifying there would put a full re-measure inside the
+    // move path and give every droppable a second render per boundary crossing.
+    const isSameNode = existing?.node === node && existing.kind === kind
+    if (!isSameNode) onRegistrationAdded()
   }
 
   const unregisterDroppableOfAnyKind = (id: DndId): void => {
