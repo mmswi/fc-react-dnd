@@ -41,6 +41,10 @@
     "./use-dnd-monitor": {
       "types": "./dist/use-dnd-monitor.d.ts",
       "default": "./dist/use-dnd-monitor.js"
+    },
+    "./pointer-sensor": {
+      "types": "./dist/pointer-sensor.d.ts",
+      "default": "./dist/pointer-sensor.js"
     }
   },
   "scripts": {

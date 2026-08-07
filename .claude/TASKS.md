@@ -60,7 +60,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 
 ## P5 — Sensors
 
-- [ ] [T5.1](tasks/T5.1-pointer-sensor.md) — `src/pointer-sensor.ts` + tests
+- [x] [T5.1](tasks/T5.1-pointer-sensor.md) — `src/pointer-sensor.ts` + tests
 - [ ] [T5.2](tasks/T5.2-keyboard-sensor.md) — `src/keyboard-sensor.ts` + tests
 
 ## P6 — Overlay, auto-scroll, accessibility
