@@ -2,7 +2,7 @@
 
 A React drag-and-drop library written from scratch. Performance, maintainability, and readability are the product; bundle size is explicitly not a current concern. MIT licensed. Zero runtime dependencies — `react` and `react-dom` are peer dependencies (>= 18).
 
-**Scope (locked with the user):** sortable list, pointer + keyboard sensors, exactly one collision strategy (`closestCenter`), a drag overlay — and one hard thing done deeply: **first-class tree drag-and-drop** (drop-into vs drop-between, depth projection during drag, cycle prevention) as pure, Node-tested functions. The ecosystem punts on the tree case; this library doesn't. Deliverables around the code: a StrictMode-clean demo, a React Profiler render-count comparison against dnd-kit, and a technical blog post — **the blog post is the actual artifact; the library is the evidence for it.**
+**Scope (locked with the user):** sortable list, pointer + keyboard sensors, exactly one collision strategy (`closestCenter`), a drag overlay — and one hard thing done deeply: **first-class tree drag-and-drop** (drop-into vs drop-between, depth projection during drag, cycle prevention) as pure, Node-tested functions. Every general-purpose React DnD library stops at the same boundary: it reports what gesture you made relative to *one row*, and leaves you to compute the actual outcome. This library returns the outcome — `(parentId, index, depth)`, clamped against both neighbours, with the active subtree excluded so a cycle cannot be expressed. That's the differentiator; see `.claude/ANALYSIS.md` § A2 for the evidence and § A1 for why the boundary exists. Deliverables around the code: a StrictMode-clean demo, a React Profiler render-count comparison against dnd-kit, and a technical blog post — **the blog post is the actual artifact; the library is the evidence for it.**
 
 ## Ground rules — read first, non-negotiable
 
@@ -15,10 +15,11 @@ A React drag-and-drop library written from scratch. Performance, maintainability
 
 ## Task workflow
 
-The board is split in two so each piece stays small enough to read in full:
+The board is split so each piece stays small enough to read in full:
 
 - **`.claude/TASKS.md`** — the table of contents. One line per task: status, id, title, link. Phases `P0..P10`, tasks `T<phase>.<n>`.
 - **`.claude/tasks/T<phase>.<n>-<slug>.md`** — one file per task: goal, the test that opens it, acceptance criteria, files touched, and a "where it stands" note.
+- **`.claude/ANALYSIS.md`** — the reasoning *behind* the board: problem definitions, brainstorming, and research, in numbered entries (`A1`, `A2`, …). Every claim about the outside world carries a `[verified]` / `[unverified]` / `[open]` tag. Read it before reopening a scope decision, and add to it before making one. **An `[unverified]` claim must never reach the README or the blog post** — promote it with a named source or drop it.
 
 Rules:
 
@@ -87,12 +88,14 @@ Headless, store-first. All drag state lives in a plain external store (`src/inte
 1. **No DOM reads in the pointermove path.** Rects are read once at `beginDrag`, cached in the store; re-measure only through the dirty flag.
 2. **Reads batched before writes** — never interleaved (see the standards' layout-thrashing section; the `layout-thrashing-prevention` skill has the full model).
 3. **Motion is `transform`/`opacity` only**; overlay DOM writes are rAF-coalesced (one write per frame max).
-4. A store notification during a move re-renders **at most the active draggable** (only if it selects `transform`) — never the provider subtree.
-5. Draggable/droppable registration (mount/unmount) never notifies subscribers.
+4. A store notification whose selected slice is unchanged **never enters React**: `useSyncExternalStore`'s subscribe wrapper compares first and only then schedules, so there is no lane, no root scheduling, and no render at all (`ReactFiberHooks.js:1859-1893`). This is a guarantee, not an optimization that might not fire. Only the active draggable (and only if it selects `transform`) renders during a move; the provider subtree never does. See `.claude/ANALYSIS.md` § A3.1.
+5. Draggable/droppable registration (mount/unmount) never notifies subscribers — **while no drag is active.** During an active drag it is a structural event, and the policy is asymmetric by design (see `.claude/ANALYSIS.md` § A6):
+   - **Unregistration cancels the drag**, returning the item to its origin. Any removal — the active item, the current `over`, or any other row — invalidates cached geometry, and cancelling leaves no window in which a drop position derived from a vanished tree can be presented. Without this, a collaborator deleting a row produces a **silently wrong drop**.
+   - **Registration does not cancel**; it marks rects dirty, re-measures, and re-collides. Cancelling on insertion would break tree auto-expand-on-hover (which mounts rows as a result of the user's own drag) and any lazy-loading list reached by auto-scroll.
 6. Event listeners are passive except where `preventDefault` is load-bearing (activated pointermove, keyboard activation keys).
 7. Per-interaction state (listeners, autoscroll loop) is torn down completely on end/cancel/unmount — no leaks between drags.
 8. **StrictMode-clean**: double-invoked effects must not double-register, double-subscribe, or leak. The demo runs inside `<StrictMode>`.
-9. Derived per-move computations shared by many subscribers (list projection, tree projection) are memoized **once per store-state version** (WeakMap keyed by the immutable state object), then read by O(1) selectors — never recomputed per subscriber.
+9. Derived per-move computations shared by many subscribers (list projection, tree projection) are memoized **once per store-state version** (WeakMap keyed by the immutable state object), then read by O(1) selectors — never recomputed per subscriber. **This is *the* performance constraint of the architecture, not an optimization.** Invariant 4 buys you no re-render, but reaching that conclusion requires React to call `getSnapshot` — so every subscriber's selector runs on every notification regardless of outcome. 50 rows at 120 Hz is ~6,000 selector calls per second in the steady state where nothing re-renders; if one recomputes a projection, the move path is O(N²) and the frame is gone. The selector must also return a **cached reference** — an uncached one is an infinite loop, which is what React's DEV double-call detects. See `.claude/ANALYSIS.md` § A3.2.
 
 ## Accessibility invariants
 
@@ -115,7 +118,7 @@ Headless, store-first. All drag state lives in a plain external store (`src/inte
 - Tests are colocated (`foo.ts` → `foo.test.ts` / `foo.test.tsx`); shared helpers live in `test/`.
 - Every tunable is a named constant (`DEFAULT_ACTIVATION_DISTANCE_PX`, `AUTO_SCROLL_EDGE_PX`, …) defined next to its use — no bare literals in logic.
 - `@dnd-kit/*` may appear **only** inside `playground/` as the profiler-comparison baseline — never anywhere in the library itself.
-- The blog post (`docs/`) is written with the `explain-how-it-works` skill loaded; profiler numbers in it must come from the actual comparison run, never estimated.
+- The blog post (`docs/`) is written with the `explain-how-it-works` skill loaded; profiler numbers in it must come from the actual comparison run, never estimated. The same rule governs **competitive claims**: any statement about what another library does or doesn't support must be `[verified]` in `.claude/ANALYSIS.md` against a named source before it appears in public writing. This is not hypothetical — the project's original framing ("the ecosystem punts on the tree case") was checked in `A2` and turned out to be **false**; Atlassian ships tree instructions. Re-verify before publishing, since these libraries move.
 
 ## Testing notes
 
@@ -124,6 +127,7 @@ Headless, store-first. All drag state lives in a plain external store (`src/inte
 - `PointerEvent` and pointer-capture methods are polyfilled in `test/setup.ts` — don't assume jsdom provides them.
 - rAF-dependent tests use `vi.useFakeTimers({ toFake: ['requestAnimationFrame'] })` and the `nextFrame()` helper; store logic is synchronous by design and needs no frame control.
 - Integration tests drive real DOM events (`fireEvent.pointerDown` …), never sensor internals.
+- **Render-count assertions should count commits, and must say which they count.** For store-driven granularity (the P4/P7/P8 tests), a counter in the component body is accurate — an unchanged slice never schedules a render, so the body genuinely does not run. The ambiguity appears when a **parent** re-renders: `useSyncExternalStore` then reaches React's *late* bailout, which runs the body and discards the output (`ReactFiberBeginWork.js:1519-1522`), so a body counter ticks on a render that committed nothing. Counting in a `useEffect` / `<Profiler>` `onRender` is unambiguous under both paths — prefer it, and state the method in the test. Every "re-renders exactly N times" criterion on the board means **commits**. Background: `.claude/ANALYSIS.md` § A3.1.
 
 ## Release checklist (v0.1 target: *ready to publish*; publishing itself is the user's call)
 
