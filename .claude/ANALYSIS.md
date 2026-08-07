@@ -1069,6 +1069,14 @@ in the same commit. Owner: [T2.1](tasks/T2.1-public-types.md).
 If a sensor is ever written that genuinely needs to move the visual position without
 re-collision, the discriminating test exists first and `setTransform` comes back with it.
 
+**Amended 2026-08-08 while writing T2.1 — a fourth member, `findTargetInDirection`.** The
+keyboard sensor must answer "what is the next droppable upward?", and there are only two ways
+to give it that: a geometry query on the session, or a public rect cache. The query wins on
+both counts that matter here — the sensor never reads the DOM, so perf invariant 1 holds for
+the keyboard path too, and the measure-only-rows rule (§ A7 D3) stays an internal detail of
+[T3.1](tasks/T3.1-store.md) rather than something every sensor author has to know. The
+session is therefore `move` / `end` / `cancel` / `findTargetInDirection`.
+
 ### A9.2 — `beginDrag` takes a nullable `pointer`, and that is what gates auto-scroll
 
 Auto-scroll ([T6.2](tasks/T6.2-auto-scroll.md)) must run for pointer drags and **not** for

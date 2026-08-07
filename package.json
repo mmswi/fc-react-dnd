@@ -14,58 +14,6 @@
   },
   "exports": {
     "./package.json": "./package.json",
-    "./dnd-provider": {
-      "types": "./dist/dnd-provider.d.ts",
-      "default": "./dist/dnd-provider.js"
-    },
-    "./use-draggable": {
-      "types": "./dist/use-draggable.d.ts",
-      "default": "./dist/use-draggable.js"
-    },
-    "./use-droppable": {
-      "types": "./dist/use-droppable.d.ts",
-      "default": "./dist/use-droppable.js"
-    },
-    "./use-active-drag": {
-      "types": "./dist/use-active-drag.d.ts",
-      "default": "./dist/use-active-drag.js"
-    },
-    "./use-dnd-monitor": {
-      "types": "./dist/use-dnd-monitor.d.ts",
-      "default": "./dist/use-dnd-monitor.js"
-    },
-    "./drag-overlay": {
-      "types": "./dist/drag-overlay.d.ts",
-      "default": "./dist/drag-overlay.js"
-    },
-    "./pointer-sensor": {
-      "types": "./dist/pointer-sensor.d.ts",
-      "default": "./dist/pointer-sensor.js"
-    },
-    "./keyboard-sensor": {
-      "types": "./dist/keyboard-sensor.d.ts",
-      "default": "./dist/keyboard-sensor.js"
-    },
-    "./collision": {
-      "types": "./dist/collision.d.ts",
-      "default": "./dist/collision.js"
-    },
-    "./sortable-list": {
-      "types": "./dist/sortable-list.d.ts",
-      "default": "./dist/sortable-list.js"
-    },
-    "./use-sortable": {
-      "types": "./dist/use-sortable.d.ts",
-      "default": "./dist/use-sortable.js"
-    },
-    "./tree": {
-      "types": "./dist/tree.d.ts",
-      "default": "./dist/tree.js"
-    },
-    "./use-tree-drop": {
-      "types": "./dist/use-tree-drop.d.ts",
-      "default": "./dist/use-tree-drop.js"
-    },
     "./types": {
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"

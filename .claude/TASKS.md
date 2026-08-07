@@ -40,7 +40,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 
 ## P2 — Core primitives (pure, no React, Node-testable)
 
-- [ ] [T2.1](tasks/T2.1-public-types.md) — `src/types.ts`, the shared public type surface
+- [x] [T2.1](tasks/T2.1-public-types.md) — `src/types.ts`, the shared public type surface
 - [ ] [T2.2](tasks/T2.2-geometry.md) — `src/internal/geometry.ts` + tests
 - [ ] [T2.3](tasks/T2.3-collision-closest-center.md) — `src/collision.ts` + tests: `closestCenter`
 
