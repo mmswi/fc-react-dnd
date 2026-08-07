@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Matches package.json#engines. bun drives the scripts, but Vitest and tsc run on
+        # Node, so the matrix is what actually proves the supported range.
+        node-version: [22, 24]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+
+      # A stale bun.lock must fail here rather than resolve to something CI never committed.
+      - run: bun install --frozen-lockfile
+
+      # One step, so the CI gate and the local gate cannot drift apart.
+      - run: bun run verify
