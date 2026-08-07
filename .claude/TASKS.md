@@ -74,7 +74,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 - [x] [T7.1](tasks/T7.1-list-projection.md) — `src/internal/list-projection.ts` + tests
 - [x] [T7.2](tasks/T7.2-sortable-list.md) — `src/sortable-list.tsx`
 - [x] [T7.3](tasks/T7.3-use-sortable.md) — `src/use-sortable.ts`
-- [ ] [T7.4](tasks/T7.4-sortable-granularity-tests.md) — render-granularity + StrictMode tests
+- [x] [T7.4](tasks/T7.4-sortable-granularity-tests.md) — render-granularity + StrictMode tests
 
 ## P8 — Tree drag-and-drop (the flagship)
 
