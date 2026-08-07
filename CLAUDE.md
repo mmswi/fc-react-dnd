@@ -57,7 +57,7 @@ Rules:
 
 Headless, store-first. All drag state lives in a plain external store (`src/internal/store.ts`), created **per `DndProvider` instance** (never module-level — SSR-safe, multi-provider-safe). React subscribes to narrow slices via `useSyncExternalStore`, so a 120 Hz pointer stream re-renders almost nothing:
 
-- **Sensors** translate DOM events into store lifecycle calls. On activation they receive a `DragSession` (`move` / `setTransform` / `end` / `cancel`) and own their window/document listeners for the duration of one interaction. Stale sessions (after end/cancel) become no-ops via a session token.
+- **Sensors** translate DOM events into store lifecycle calls. On activation they receive a `DragSession` (`move` / `end` / `cancel`) and own their window/document listeners for the duration of one interaction. Stale sessions (after end/cancel) become no-ops via a session token. (`setTransform` was dropped before P1 — no test could tell it apart from `move`; see `.claude/ANALYSIS.md` § A9.1.)
 - **The store** measures droppable rects **once** at `beginDrag` (batched reads), caches them, and runs collision detection against the cache on every move — no DOM reads in the move path. Scroll/resize during a drag set a dirty flag; rects re-measure lazily on the next update.
 - **`DragOverlay`** follows the pointer by writing `style.transform` directly to its element inside `requestAnimationFrame` — zero React renders per move. `pointer-events: none` so it never blocks hit-testing.
 - **`useDraggable` / `useDroppable`** re-render only on the slices they select (`isDragging`, `isOver`) — i.e. on drag start/end and over-change, not per move. Registration happens in effects and never notifies subscribers.

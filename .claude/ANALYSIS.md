@@ -1033,3 +1033,150 @@ registration never notifies (5), teardown is complete (7), StrictMode-clean (8).
 Nothing else in React 19 changes the design: no `use()`, actions, or optimistic state
 anywhere near this library's needs; `useSyncExternalStore` semantics are the A3-verified
 ones.
+
+## A9 — Implementation decisions frozen before P1 (2026-08-08)
+
+Forty files depend on a handful of shapes. Deciding them once, here, is cheaper than
+discovering them forty times. Each entry names the decision, the alternative it beat, and
+the task that owns it. Anything a test later disproves gets corrected **in place** with a
+dated note, not appended as a second opinion.
+
+### A9.1 — `DragSession` is `move` / `end` / `cancel`. `setTransform` is dropped
+
+`CLAUDE.md` § Architecture named four session operations (`move` / `setTransform` / `end` /
+`cancel`). The split was going to be "`move` re-collides, `setTransform` doesn't". It does
+not survive its own motivating case: the keyboard sensor's ArrowLeft/Right indent step. That
+step changes `translate.x` only, and re-running collision over it cannot change `over` —
+droppables have not moved, and tree rows are **measure-only** (§ A7 D3), so collision never
+sees them at all. There is no observable difference for a consumer or for the overlay, which
+means there is no test that can discriminate the two operations. A public method whose
+behaviour cannot be pinned by a test is a maintenance liability, not an API.
+
+**Decided:** one translate-changing operation.
+
+```ts
+type DragSession = {
+  move: (translate: Translate) => void
+  end: () => void
+  cancel: (reason: DragCancelReason) => void
+}
+```
+
+Nothing is published yet, so this is a construction-time refinement rather than a breaking
+change — but it *is* a change to `CLAUDE.md`'s stated architecture, so `CLAUDE.md` is edited
+in the same commit. Owner: [T2.1](tasks/T2.1-public-types.md).
+
+If a sensor is ever written that genuinely needs to move the visual position without
+re-collision, the discriminating test exists first and `setTransform` comes back with it.
+
+### A9.2 — `beginDrag` takes a nullable `pointer`, and that is what gates auto-scroll
+
+Auto-scroll ([T6.2](tasks/T6.2-auto-scroll.md)) must run for pointer drags and **not** for
+keyboard drags — the keyboard path uses `scrollIntoView`. Rather than a
+`activatorType: 'pointer' | 'keyboard'` enum that every future sensor has to classify itself
+into, the store takes the pointer position the drag started from:
+
+```ts
+beginDrag({ id, pointer: Point | null })
+```
+
+A drag with no pointer origin has no edge proximity to compute, so auto-scroll is off by
+construction rather than by a switch someone can forget. The store derives the live pointer
+position as `initialPointer + translate`, so `move(translate)` remains the only thing a
+sensor reports. Owners: [T3.1](tasks/T3.1-store.md), [T6.2](tasks/T6.2-auto-scroll.md).
+
+### A9.3 — The rect cache lives **inside** the immutable state object
+
+Perf invariant 9 memoizes derived projections in a WeakMap keyed on the store's state
+object. That is only sound if everything the projection reads is reachable from the key. The
+projection reads cached rects. So the cache cannot be a `Map` the store mutates in place
+beside the state — a lazy re-measure would leave every memoized projection stale, silently,
+with the exact symptom (a drop landing one row off after a scroll) that is hardest to trace.
+
+**Decided:** `state.droppableRects` is a `ReadonlyMap<DndId, Rect>` **replaced** on every
+re-measure, and re-measuring mints a new state object like any other transition. Allocating
+one Map per re-measure is nothing — re-measures happen at drag start, on the dirty flag, and
+on mid-drag registration, not per move. Owner: [T3.1](tasks/T3.1-store.md).
+
+### A9.4 — Registration is a **ref callback with cleanup**, options sync separately
+
+A8 left this open and instructed whoever builds T4.2/T4.3/T8.2 to decide it. Decided: ref
+callback (React 19 cleanup form) for the node, a small effect for the mutable options.
+
+The deciding argument is not elegance, it is a bug the effect version has and the ref version
+does not. Under the A6 policy, **unregistering mid-drag cancels the drag**. An effect whose
+dependency array contains `data` re-runs whenever the consumer passes a fresh object literal —
+which is the normal way people write `data={{ index }}` — so an ordinary parent re-render
+during a drag would unregister, cancel the drag, and look like a library bug. A ref callback
+keyed on the node re-runs only when the node identity actually changes, which is the thing
+registration is actually about.
+
+```ts
+const setNodeRef = useCallback((node: HTMLElement | null) => {
+  store.registerDraggable(id, node)
+  return () => store.unregisterDraggable(id)
+}, [store, id])
+```
+
+Mutable options (`data`, `disabled`) are pushed into the existing registry entry from an
+effect; the registries are mutable and non-notifying (perf invariant 5), so this costs no
+render and cannot cancel anything. Registration also lands in the **commit phase**, ahead of
+passive effects, so a row that mounts mid-drag is measurable before paint. StrictMode's
+attach → detach → attach cycle is exactly the idempotency perf invariant 8 asks for; the
+observed behaviour is recorded in T4.2's "Where it stands" once the test runs.
+
+Owners: [T4.2](tasks/T4.2-use-draggable.md), [T4.3](tasks/T4.3-use-droppable.md),
+[T8.2](tasks/T8.2-use-tree-drop.md).
+
+### A9.5 — Sensors are factories; `handleProps` merges every sensor's activators
+
+```ts
+type Sensor = { name: string; activate: (context: SensorContext) => SensorActivatorProps }
+pointerSensor(options?: PointerSensorOptions): Sensor
+```
+
+A factory is what lets options be per-instance (`pointerSensor({ activationDistancePx: 12 })`)
+without a second configuration channel. `useDraggable` calls `activate` for each configured
+sensor and merges the returned handlers, so two sensors both wanting `onKeyDown` both get
+called — the failure T4.2 has a red test for.
+
+`DndProvider` defaults `sensors` to `[pointerSensor(), keyboardSensor()]`. That imports both
+sensor modules from the provider, which a bundle-size-sensitive library would refuse; bundle
+size is explicitly not a concern here (`CLAUDE.md` § opening), and a provider that does
+nothing until you discover the `sensors` prop is the worse trade. Owners:
+[T2.1](tasks/T2.1-public-types.md), [T4.1](tasks/T4.1-dnd-provider.md),
+[T4.2](tasks/T4.2-use-draggable.md).
+
+### A9.6 — Collision receives an ordered array of already-filtered candidates
+
+```ts
+type CollisionArgs = {
+  active: { id: DndId; rect: Rect }        // rect is already translated
+  droppables: readonly DroppableCandidate[] // registration order; disabled already removed
+}
+type CollisionDetection = (args: CollisionArgs) => DndId | null
+```
+
+Three boundaries decided at once, each because the alternative hides a bug:
+
+- **The store translates the active rect**, so a custom strategy cannot forget to.
+- **The store filters disabled droppables and measure-only rows**, which is the boundary
+  [T2.3](tasks/T2.3-collision-closest-center.md) deliberately pins with a test — the math
+  must stay dumb about policy.
+- **An ordered array, not a Map or an object**, because determinism on equidistant candidates
+  is an asserted behaviour and "registration order" has to be a thing the strategy can see.
+
+Owners: [T2.1](tasks/T2.1-public-types.md), [T2.3](tasks/T2.3-collision-closest-center.md),
+[T3.1](tasks/T3.1-store.md).
+
+### A9.7 — Test-run discipline inside a task
+
+`bun run typecheck && bun run test` during the red→green loop; the full `bun run verify` once
+at the task boundary, before the commit. And `bun run verify` cannot be green until
+[T2.1](tasks/T2.1-public-types.md) puts a file in `src/` — `tsc` fails an empty `include` with
+`TS18003` — so P1's tasks close on their own criteria, as
+[T1.6](tasks/T1.6-install-green.md) already says.
+
+`"types": []` in the base tsconfig ([T1.3](tasks/T1.3-tsconfig.md)) means there are no
+ambient Vitest globals: every test imports what it uses from `vitest` explicitly. That is the
+same rule as the standards' no-namespace-import line, arriving from the config side.
