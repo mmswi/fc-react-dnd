@@ -51,3 +51,15 @@ export const nextFrame = async (): Promise<void> => {
   vi.advanceTimersToNextFrame()
   await Promise.resolve()
 }
+
+/**
+ * Let the store's end-of-task removal check run.
+ *
+ * A registration disappearing does not cancel a drag on the spot — React re-attaches inline refs
+ * on every render, and StrictMode attaches, detaches and re-attaches a newly mounted component's
+ * refs, so "gone" is only knowable once the current task finishes. Tests that remove a row have
+ * to reach that point before asserting.
+ */
+export const flushRemovalCheck = async (): Promise<void> => {
+  await Promise.resolve()
+}

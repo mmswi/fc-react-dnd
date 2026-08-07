@@ -379,7 +379,7 @@ describe('the keyboard path', () => {
 })
 
 describe('rows appearing and disappearing mid-drag', () => {
-  it('cancels when a row unmounts — a collapsing branch is a removal (§A6)', () => {
+  it('cancels when a row unmounts — a collapsing branch is a removal (§A6)', async () => {
     const onDragCancel = vi.fn()
     let store: DragStore | null = null
     const sensors = [pointerSensor({ activationDistancePx: ACTIVATION_DISTANCE_PX })]
@@ -418,6 +418,7 @@ describe('rows appearing and disappearing mid-drag', () => {
     dragRowTo(view.getByTestId('row-changelog'), CHANGELOG_ROW_CENTRE, ROW_HEIGHT_PX)
 
     view.rerender(<Host collapsed />)
+    await act(async () => {})
 
     expect(onDragCancel).toHaveBeenCalledTimes(1)
     expect(onDragCancel.mock.calls[0]?.[0].reason).toBe('item-removed')

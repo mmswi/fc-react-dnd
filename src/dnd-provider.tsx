@@ -133,6 +133,37 @@ export const DndProvider = ({
     }
   }, [store, autoScroller, autoScroll])
 
+  /**
+   * Rects go stale when the page moves under a drag, and the pointer may not move at all while
+   * it happens — a scrolling container, a resized window, a sticky header collapsing. Without
+   * this the drop lands against geometry from before the scroll.
+   *
+   * Listeners exist only for the duration of a drag: a capture-phase `scroll` hears scrolling in
+   * *any* container rather than only the window's, and both are passive because neither handler
+   * calls `preventDefault`.
+   */
+  useEffect(() => {
+    const markRectsDirty = () => store.markRectsDirty()
+    const stopWatching = () => {
+      window.removeEventListener('scroll', markRectsDirty, true)
+      window.removeEventListener('resize', markRectsDirty)
+    }
+
+    const removeMonitor = store.addMonitor({
+      onDragStart: () => {
+        window.addEventListener('scroll', markRectsDirty, { capture: true, passive: true })
+        window.addEventListener('resize', markRectsDirty, { passive: true })
+      },
+      onDragEnd: stopWatching,
+      onDragCancel: stopWatching,
+    })
+
+    return () => {
+      removeMonitor()
+      stopWatching()
+    }
+  }, [store])
+
   // Every dependency is either the store, a `useId` result, a plain string, or an array the
   // consumer owns — so nothing here churns on an ordinary parent re-render.
   const contextValue = useMemo<DndContextValue>(

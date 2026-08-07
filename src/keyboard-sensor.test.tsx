@@ -312,7 +312,7 @@ describe('cancelling', () => {
     expect(onDragCancel).not.toHaveBeenCalled()
   })
 
-  it('survives the draggable unmounting mid-drag without leaving the drag alive', () => {
+  it('survives the draggable unmounting mid-drag without leaving the drag alive', async () => {
     let store: DragStore | null = null
     const sensors = [keyboardSensor()]
     const Host = ({ mounted }: { mounted: boolean }) => (
@@ -329,6 +329,7 @@ describe('cancelling', () => {
     pressKey(view.getByTestId('handle-item'), ' ')
 
     view.rerender(<Host mounted={false} />)
+    await act(async () => {})
 
     expect((store as unknown as DragStore).getState().origin).toBeNull()
   })

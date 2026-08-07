@@ -155,6 +155,18 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
 
   let state = createIdleState()
   let rectsAreDirty = false
+  /**
+   * Ids whose registration has gone, waiting to see whether it comes back.
+   *
+   * The A6 policy cancels a drag when a registered node disappears — but "disappeared" cannot be
+   * read from the instant an entry leaves the registry. React re-attaches a consumer's inline
+   * ref on every render, and StrictMode runs a newly mounted component's effects **and refs** as
+   * attach → detach → attach: mid-drag, both look exactly like a removal. Checking at the end of
+   * the current task instead means a registration that came straight back was never gone, and a
+   * component mounting during a drag no longer cancels it.
+   */
+  const pendingRemovals = new Set<DndId>()
+  let removalCheckIsScheduled = false
   /** Bumped on every begin and every end/cancel, so a session outlives nothing. */
   let sessionToken = 0
 
@@ -262,8 +274,25 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
    * **Insertion does not cancel**, because the tree's own auto-expand-on-hover mounts rows as
    * a *result* of the user's drag, and so does a lazily-loaded list reached by auto-scroll.
    */
-  const onRegistrationRemoved = (): void => {
-    if (state.origin) cancelDrag(DRAG_CANCEL_REASONS.itemRemoved)
+  const confirmRemovals = (): void => {
+    removalCheckIsScheduled = false
+    const candidates = [...pendingRemovals]
+    pendingRemovals.clear()
+    if (!state.origin) return
+
+    const somethingIsActuallyGone = candidates.some(
+      (id) => !droppables.has(id) && !draggables.has(id),
+    )
+    if (somethingIsActuallyGone) cancelDrag(DRAG_CANCEL_REASONS.itemRemoved)
+  }
+
+  const onRegistrationRemoved = (id: DndId): void => {
+    if (!state.origin) return
+
+    pendingRemovals.add(id)
+    if (removalCheckIsScheduled) return
+    removalCheckIsScheduled = true
+    queueMicrotask(confirmRemovals)
   }
 
   const onRegistrationAdded = (): void => {
@@ -387,7 +416,7 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
 
   const unregisterDroppableOfAnyKind = (id: DndId): void => {
     if (!droppables.delete(id)) return
-    onRegistrationRemoved()
+    onRegistrationRemoved(id)
   }
 
   return {
@@ -419,7 +448,7 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
 
     unregisterDraggable: (id) => {
       if (!draggables.delete(id)) return
-      onRegistrationRemoved()
+      onRegistrationRemoved(id)
     },
 
     updateDraggable: (id, patch) => {

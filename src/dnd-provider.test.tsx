@@ -170,7 +170,7 @@ describe('drag callbacks', () => {
     expect(order).toEqual(['start', 'move', 'over', 'end'])
   })
 
-  it('reports every DragCancelReason distinctly, not all of them as escape', () => {
+  it('reports every DragCancelReason distinctly, not all of them as escape', async () => {
     const reasons: string[] = []
     let store: DragStore | null = null
     render(
@@ -195,8 +195,11 @@ describe('drag callbacks', () => {
 
       readyStore.beginDrag('item', { pointer: null })
       readyStore.cancelActiveDrag(DRAG_CANCEL_REASONS.pointerCancelled)
+    })
 
-      // The fourth is not a call anyone makes — it is the library reacting to a node vanishing.
+    // The fourth is not a call anyone makes — it is the library reacting to a node vanishing,
+    // which it confirms at the end of the task rather than the instant the entry goes.
+    await act(async () => {
       readyStore.beginDrag('item', { pointer: null })
       readyStore.unregisterDraggable('item')
     })

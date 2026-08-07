@@ -411,7 +411,7 @@ describe('mounting and unmounting during a drag — ANALYSIS.md A6', () => {
     expect(readyStore.getState().overId).toBe('inserted')
   })
 
-  it('cancels with item-removed when a droppable unmounts mid-drag, leaving over null', () => {
+  it('cancels with item-removed when a droppable unmounts mid-drag, leaving over null', async () => {
     let store: DragStore | null = null
     let removeRow: (() => void) | null = null
     const onDragCancel = vi.fn()
@@ -436,7 +436,7 @@ describe('mounting and unmounting during a drag — ANALYSIS.md A6', () => {
       readyStore.beginDrag('item', { pointer: null })
     })
 
-    act(() => {
+    await act(async () => {
       removeRow?.()
     })
 

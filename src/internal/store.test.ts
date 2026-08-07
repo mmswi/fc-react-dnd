@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockElementRect } from '../../test/helpers.js'
+import { flushRemovalCheck, mockElementRect } from '../../test/helpers.js'
 import { closestCenter } from '../collision.js'
 import { type DndId, DRAG_CANCEL_REASONS, DRAG_DIRECTIONS, type Rect } from '../types.js'
 import { createDragStore, type DragStore, type RectReader } from './store.js'
@@ -219,7 +219,7 @@ describe('the immutable state object', () => {
 })
 
 describe('the asymmetric registration policy during a drag — ANALYSIS.md A6', () => {
-  it('cancels when an unrelated row is removed, because every rect below it just moved', () => {
+  it('cancels when an unrelated row is removed, because every rect below it just moved', async () => {
     const { store, addDraggable, addDroppable } = createHarness()
     const monitor = { onDragCancel: vi.fn(), onDragEnd: vi.fn() }
     store.addMonitor(monitor)
@@ -229,6 +229,7 @@ describe('the asymmetric registration policy during a drag — ANALYSIS.md A6', 
     store.beginDrag('item', { pointer: { x: 0, y: 0 } })
 
     store.unregisterDroppable('above')
+    await flushRemovalCheck()
 
     expect(monitor.onDragCancel).toHaveBeenCalledTimes(1)
     expect(monitor.onDragCancel.mock.calls[0]?.[0].reason).toBe(DRAG_CANCEL_REASONS.itemRemoved)
@@ -236,7 +237,7 @@ describe('the asymmetric registration policy during a drag — ANALYSIS.md A6', 
     expect(store.getState().origin).toBeNull()
   })
 
-  it('cancels when the current over row is removed', () => {
+  it('cancels when the current over row is removed', async () => {
     const { store, addDraggable, addDroppable } = createHarness()
     const monitor = { onDragCancel: vi.fn() }
     store.addMonitor(monitor)
@@ -246,11 +247,12 @@ describe('the asymmetric registration policy during a drag — ANALYSIS.md A6', 
     expect(store.getState().overId).toBe('target')
 
     store.unregisterDroppable('target')
+    await flushRemovalCheck()
 
     expect(monitor.onDragCancel).toHaveBeenCalledTimes(1)
   })
 
-  it('cancels when the active row itself is removed', () => {
+  it('cancels when the active row itself is removed', async () => {
     const { store, addDraggable } = createHarness()
     const monitor = { onDragCancel: vi.fn() }
     store.addMonitor(monitor)
@@ -258,12 +260,13 @@ describe('the asymmetric registration policy during a drag — ANALYSIS.md A6', 
     store.beginDrag('item', { pointer: null })
 
     store.unregisterDraggable('item')
+    await flushRemovalCheck()
 
     expect(monitor.onDragCancel).toHaveBeenCalledTimes(1)
     expect(store.getState().origin).toBeNull()
   })
 
-  it('cancels when a measure-only tree row is removed — a collapsing branch is a removal', () => {
+  it('cancels when a measure-only tree row is removed — a collapsing branch is a removal', async () => {
     const { store, addDraggable, addMeasureOnlyRow } = createHarness()
     const monitor = { onDragCancel: vi.fn() }
     store.addMonitor(monitor)
@@ -272,6 +275,7 @@ describe('the asymmetric registration policy during a drag — ANALYSIS.md A6', 
     store.beginDrag('item', { pointer: null })
 
     store.unregisterMeasuredRow('child')
+    await flushRemovalCheck()
 
     expect(monitor.onDragCancel).toHaveBeenCalledTimes(1)
     expect(monitor.onDragCancel.mock.calls[0]?.[0].reason).toBe(DRAG_CANCEL_REASONS.itemRemoved)
