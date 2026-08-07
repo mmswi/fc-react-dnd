@@ -1,0 +1,6 @@
+# Bun's default is a hoisted node_modules, which makes transitive dependencies importable.
+# A stray import of one would typecheck and pass tests here, then fail for a consumer —
+# so we need the isolated (pnpm-style) layout to keep "zero runtime dependencies" honest
+# at develop time rather than only at publish time.
+[install]
+linker = "isolated"
