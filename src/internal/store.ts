@@ -20,7 +20,7 @@ import type {
   Rect,
   Translate,
 } from '../types.js'
-import { DRAG_CANCEL_REASONS } from '../types.js'
+import { DRAG_CANCEL_REASONS, DRAG_DIRECTIONS } from '../types.js'
 import { readElementRect } from './dom.js'
 import {
   centerOf,
@@ -110,6 +110,16 @@ export type DragStore = {
 
   addMonitor: (listeners: DndMonitorListeners) => () => void
 
+  /**
+   * Say something to the live region directly.
+   *
+   * Tree rows are measure-only and so produce no `over` events, which is what the region
+   * normally narrates. `useTreeDrop` announces its **projection** through here instead
+   * (`ANALYSIS.md` § A7 F9).
+   */
+  announce: (message: string) => void
+  subscribeToAnnouncements: (listener: (message: string) => void) => () => void
+
   /** The element the active drag started from — auto-scroll resolves its scroll container. */
   getActiveNode: () => HTMLElement | null
 
@@ -141,6 +151,7 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
 
   const listeners = new Set<() => void>()
   const monitors = new Set<DndMonitorListeners>()
+  const announcementListeners = new Set<(message: string) => void>()
 
   let state = createIdleState()
   let rectsAreDirty = false
@@ -320,10 +331,25 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
           if (id !== origin.id) candidates.push({ id, rect })
         }
 
+        // A directional step is answered from where the item is **along that axis**.
+        // Displacement on the other axis is indent, not position: in a tree the rows sit at
+        // different horizontal offsets by design, so letting a few levels of indent feed into
+        // the cross-axis penalty makes ArrowUp start skipping rows — and the rows it skips are
+        // exactly the "first child of X" positions.
+        const isVertical = direction === DRAG_DIRECTIONS.up || direction === DRAG_DIRECTIONS.down
+        const from = translateRect(
+          origin.rect,
+          isVertical ? { x: 0, y: translate.y } : { x: translate.x, y: 0 },
+        )
+
         const target = findNearestRectInDirection({
-          from: translateRect(origin.rect, translate),
+          from,
           direction,
           candidates,
+          // Zero for a vertical step. Tree rows are indented by depth, so any cross-axis weight
+          // makes ArrowUp prefer a shallow row further away over the deep row directly above —
+          // and the rows it skips are exactly the "first child of X" positions.
+          ...(isVertical && { crossAxisPenalty: 0 }),
         })
         if (!target) return null
 
@@ -421,6 +447,17 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
       monitors.add(monitor)
       return () => {
         monitors.delete(monitor)
+      }
+    },
+
+    announce: (message) => {
+      for (const listener of [...announcementListeners]) listener(message)
+    },
+
+    subscribeToAnnouncements: (listener) => {
+      announcementListeners.add(listener)
+      return () => {
+        announcementListeners.delete(listener)
       }
     },
 

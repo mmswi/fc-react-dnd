@@ -74,6 +74,10 @@ export const DndLiveRegion = ({ store, announcements }: LiveRegionProps) => {
     [store],
   )
 
+  // Anything that has no drag event of its own to ride on — the tree's projection, which changes
+  // without an `over` because tree rows are measure-only.
+  useEffect(() => store.subscribeToAnnouncements(setMessage), [store])
+
   return (
     <div role="status" aria-live="assertive" aria-atomic="true" style={VISUALLY_HIDDEN_STYLE}>
       {message}

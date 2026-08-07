@@ -45,7 +45,14 @@ export const translatesAreEqual = (a: Translate, b: Translate): boolean =>
  * is what makes ArrowDown feel like "the next item down" instead of "the nearest thing that
  * happens to be lower". Only the ordering matters, not the exact figure.
  */
-const CROSS_AXIS_PENALTY = 2
+/**
+ * The default weight, for candidates laid out on a grid or scattered on a page.
+ *
+ * A **tree** wants zero: rows are offset horizontally *by depth*, so penalising the cross axis
+ * makes ArrowUp prefer a shallow row three positions away over the deep row immediately above.
+ * The caller decides, because only the caller knows the layout.
+ */
+const DEFAULT_CROSS_AXIS_PENALTY = 2
 
 type Axis = { readonly main: 'x' | 'y'; readonly cross: 'x' | 'y'; readonly sign: 1 | -1 }
 
@@ -67,8 +74,9 @@ export const findNearestRectInDirection = (args: {
   readonly from: Rect
   readonly direction: DragDirection
   readonly candidates: readonly RectCandidate[]
+  readonly crossAxisPenalty?: number
 }): RectCandidate | null => {
-  const { from, direction, candidates } = args
+  const { from, direction, candidates, crossAxisPenalty = DEFAULT_CROSS_AXIS_PENALTY } = args
   const axis = AXIS_BY_DIRECTION[direction]
   const origin = centerOf(from)
 
@@ -82,7 +90,7 @@ export const findNearestRectInDirection = (args: {
     if (!isAhead) continue
 
     const offAxisDistance = Math.abs(center[axis.cross] - origin[axis.cross])
-    const score = alongDirection + offAxisDistance * CROSS_AXIS_PENALTY
+    const score = alongDirection + offAxisDistance * crossAxisPenalty
 
     if (score < bestScore) {
       best = candidate

@@ -76,8 +76,17 @@ export const keyboardSensor = (options: KeyboardSensorOptions = {}): Sensor => {
     // Nothing that way: stay put rather than wrapping around or jumping across the page.
     if (!target) return
 
-    current.translate = target.translate
-    current.session.move(target.translate)
+    // Vertical steps keep the horizontal position they had. Centring on the target would shift
+    // x by however much that row happens to be indented, and a tree reads a horizontal shift as
+    // a change of depth — so ArrowDown would silently re-parent the item. Depth stays the
+    // exclusive business of ArrowLeft/ArrowRight.
+    const isVertical = direction === DRAG_DIRECTIONS.up || direction === DRAG_DIRECTIONS.down
+    const next: Translate = isVertical
+      ? { x: current.translate.x, y: target.translate.y }
+      : target.translate
+
+    current.translate = next
+    current.session.move(next)
     target.node?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }
 
