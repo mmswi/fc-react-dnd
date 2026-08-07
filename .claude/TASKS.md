@@ -87,7 +87,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 - [x] [T9.2](tasks/T9.2-integration-keyboard-flow.md) — integration: full keyboard flow
 - [x] [T9.3](tasks/T9.3-edge-cases.md) — edge cases: disabled, Escape, unmount mid-drag, second pointer
 - [x] [T9.4](tasks/T9.4-build-and-package-checks.md) — `bun run build` emits a working `dist/`; publint + attw clean
-- [ ] [T9.5](tasks/T9.5-playground-app.md) — `playground/` Vite app: sortable, tree, dnd-kit comparison
+- [x] [T9.5](tasks/T9.5-playground-app.md) — `playground/` Vite app: sortable, tree, dnd-kit comparison
 - [ ] [T9.6](tasks/T9.6-chrome-qa-and-profiler.md) — Chrome QA + captured profiler render counts
 
 ## P10 — Docs & the artifact
