@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext } from 'react'
+import type { Sensor } from '../types.js'
 import type { DragStore } from './store.js'
 
 /**
@@ -22,6 +23,11 @@ export type DndContextValue = {
   /** Id of the hidden instructions element every handle's `aria-describedby` points at. */
   readonly instructionsId: string
   readonly draggableRoleDescription: string
+  /**
+   * `useDraggable` builds its handle props by merging every sensor's activators. A consumer
+   * passing this array owns keeping it referentially stable — see `DndProvider`'s note.
+   */
+  readonly sensors: readonly Sensor[]
 }
 
 export const DndContext = createContext<DndContextValue | null>(null)

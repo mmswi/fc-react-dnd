@@ -2,13 +2,17 @@ import { act, render } from '@testing-library/react'
 import { memo, useMemo, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { closestCenter } from '../collision.js'
+import type { Sensor } from '../types.js'
 import { DndContext, type DndContextValue, useDndContext } from './context.js'
 import { createDragStore } from './store.js'
+
+const NO_SENSORS: readonly Sensor[] = []
 
 const createContextValue = (): DndContextValue => ({
   store: createDragStore({ collisionDetection: closestCenter }),
   instructionsId: 'instructions-1',
   draggableRoleDescription: 'draggable',
+  sensors: NO_SENSORS,
 })
 
 describe('useDndContext outside a provider', () => {
@@ -76,6 +80,7 @@ describe('why the context value must be stable — ANALYSIS.md A3.5', () => {
         store,
         instructionsId: 'instructions-1',
         draggableRoleDescription: 'draggable',
+        sensors: NO_SENSORS,
       }
       return (
         <DndContext value={value}>
@@ -106,7 +111,12 @@ describe('why the context value must be stable — ANALYSIS.md A3.5', () => {
       const [, setTick] = useState(0)
       forceParentRender = () => setTick((tick) => tick + 1)
       const value = useMemo<DndContextValue>(
-        () => ({ store, instructionsId: 'instructions-1', draggableRoleDescription: 'draggable' }),
+        () => ({
+          store,
+          instructionsId: 'instructions-1',
+          draggableRoleDescription: 'draggable',
+          sensors: NO_SENSORS,
+        }),
         [],
       )
       return (
