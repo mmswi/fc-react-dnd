@@ -46,7 +46,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 
 ## P3 — Store & subscription layer
 
-- [ ] [T3.1](tasks/T3.1-store.md) — `src/internal/store.ts` + tests: the whole drag lifecycle
+- [x] [T3.1](tasks/T3.1-store.md) — `src/internal/store.ts` + tests: the whole drag lifecycle
 - [ ] [T3.2](tasks/T3.2-use-store-selector.md) — `src/internal/use-store-selector.ts` + tests
 - [ ] [T3.3](tasks/T3.3-context.md) — `src/internal/context.ts`, the per-provider store handle
 

@@ -70,7 +70,7 @@ Headless, store-first. All drag state lives in a plain external store (`src/inte
 | `use-draggable` | `src/use-draggable.ts` | `useDraggable`, `UseDraggableOptions`, `UseDraggableResult` |
 | `use-droppable` | `src/use-droppable.ts` | `useDroppable`, `UseDroppableOptions`, `UseDroppableResult` |
 | `use-active-drag` | `src/use-active-drag.ts` | `useActiveDrag` |
-| `use-dnd-monitor` | `src/use-dnd-monitor.ts` | `useDndMonitor`, `DndMonitorListeners` |
+| `use-dnd-monitor` | `src/use-dnd-monitor.ts` | `useDndMonitor` (the `DndMonitorListeners` type lives in `types` — the store fans out to it, so defining it on the hook would make `internal/` import a public React module; see `.claude/tasks/T3.1-store.md`) |
 | `drag-overlay` | `src/drag-overlay.tsx` | `DragOverlay`, `DragOverlayProps` |
 | `pointer-sensor` | `src/pointer-sensor.ts` | `pointerSensor`, `PointerSensorOptions` |
 | `keyboard-sensor` | `src/keyboard-sensor.ts` | `keyboardSensor`, `KeyboardSensorOptions` |

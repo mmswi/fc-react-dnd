@@ -223,3 +223,20 @@ export type DndAccessibility = {
   readonly instructions?: string
   readonly draggableRoleDescription?: string
 }
+
+/**
+ * Everything an observer can hear about a drag. `DndProvider` takes the same set as props and
+ * `useDndMonitor` takes it directly, so a listener that re-renders nothing sees exactly what a
+ * provider callback sees.
+ *
+ * Lives here rather than in `use-dnd-monitor.ts` because the store fans events out to these
+ * listeners, and a type defined in the hook would make the internal store import a public
+ * React module to describe its own contract.
+ */
+export type DndMonitorListeners = {
+  readonly onDragStart?: (event: DragStartEvent) => void
+  readonly onDragMove?: (event: DragMoveEvent) => void
+  readonly onDragOver?: (event: DragOverEvent) => void
+  readonly onDragEnd?: (event: DragEndEvent) => void
+  readonly onDragCancel?: (event: DragCancelEvent) => void
+}
