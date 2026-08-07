@@ -28,6 +28,17 @@ export const distanceBetweenPoints = (a: Point, b: Point): number =>
   Math.hypot(b.x - a.x, b.y - a.y)
 
 /**
+ * Value equality for a translate, for use as a selector's comparison.
+ *
+ * Memoising a projection once per move buys one *computation* per move; it does not make the
+ * `Translate` objects inside it stable, because the projection itself is new. Without comparing
+ * by value, every subscriber sees a fresh reference and re-renders — perf invariant 9 satisfied
+ * and perf invariant 4 quietly lost.
+ */
+export const translatesAreEqual = (a: Translate, b: Translate): boolean =>
+  a.x === b.x && a.y === b.y
+
+/**
  * How much harder a sideways offset counts than distance along the direction of travel.
  *
  * Above 1, an aligned candidate beats a euclidean-closer one that drifts off the axis — which

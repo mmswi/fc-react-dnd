@@ -53,6 +53,14 @@
     "./drag-overlay": {
       "types": "./dist/drag-overlay.d.ts",
       "default": "./dist/drag-overlay.js"
+    },
+    "./sortable-list": {
+      "types": "./dist/sortable-list.d.ts",
+      "default": "./dist/sortable-list.js"
+    },
+    "./use-sortable": {
+      "types": "./dist/use-sortable.d.ts",
+      "default": "./dist/use-sortable.js"
     }
   },
   "scripts": {
