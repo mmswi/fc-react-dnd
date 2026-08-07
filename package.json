@@ -61,6 +61,10 @@
     "./use-sortable": {
       "types": "./dist/use-sortable.d.ts",
       "default": "./dist/use-sortable.js"
+    },
+    "./tree": {
+      "types": "./dist/tree.d.ts",
+      "default": "./dist/tree.js"
     }
   },
   "scripts": {

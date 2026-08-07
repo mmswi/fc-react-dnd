@@ -78,7 +78,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 
 ## P8 — Tree drag-and-drop (the flagship)
 
-- [ ] [T8.1](tasks/T8.1-tree-math.md) — `src/tree.ts` + exhaustive tests: flatten, project, apply
+- [x] [T8.1](tasks/T8.1-tree-math.md) — `src/tree.ts` + exhaustive tests: flatten, project, apply
 - [ ] [T8.2](tasks/T8.2-use-tree-drop.md) — `src/use-tree-drop.ts` + tests
 
 ## P9 — Integration & verification
