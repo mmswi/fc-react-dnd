@@ -1,6 +1,8 @@
 'use client'
 
-import type { CSSProperties } from 'react'
+import { type CSSProperties, useEffect, useRef, useState } from 'react'
+import type { DndAnnouncements } from '../types.js'
+import type { DragStore } from './store.js'
 
 /**
  * Off-screen but **not** `display: none` and **not** `hidden`. Either of those removes the
@@ -36,3 +38,45 @@ export const DragInstructions = ({ id, text }: InstructionsProps) => (
     {text}
   </div>
 )
+
+type LiveRegionProps = {
+  store: DragStore
+  announcements: DndAnnouncements
+}
+
+/**
+ * Announces the drag as it happens.
+ *
+ * It subscribes to the store itself rather than being handed a message as a prop, which is what
+ * keeps the provider out of the drag: this leaf re-renders per announcement and nothing above
+ * it does. Announcements ride on the store's own events, so `onDragOver` firing **only on a
+ * change** is what stops the region turning into noise on every pointermove.
+ *
+ * `role="status"` with `aria-live="assertive"`: a drag is a direct response to the user's own
+ * action, so it should interrupt rather than queue behind whatever else is being read.
+ */
+export const DndLiveRegion = ({ store, announcements }: LiveRegionProps) => {
+  const [message, setMessage] = useState('')
+
+  const latestAnnouncements = useRef(announcements)
+  useEffect(() => {
+    latestAnnouncements.current = announcements
+  })
+
+  useEffect(
+    () =>
+      store.addMonitor({
+        onDragStart: (event) => setMessage(latestAnnouncements.current.describeDragStart(event)),
+        onDragOver: (event) => setMessage(latestAnnouncements.current.describeDragOver(event)),
+        onDragEnd: (event) => setMessage(latestAnnouncements.current.describeDragEnd(event)),
+        onDragCancel: (event) => setMessage(latestAnnouncements.current.describeDragCancel(event)),
+      }),
+    [store],
+  )
+
+  return (
+    <div role="status" aria-live="assertive" aria-atomic="true" style={VISUALLY_HIDDEN_STYLE}>
+      {message}
+    </div>
+  )
+}

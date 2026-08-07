@@ -2,15 +2,17 @@
 
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { closestCenter } from './collision.js'
+import { DEFAULT_ANNOUNCEMENTS } from './internal/announcements.js'
 import { createAutoScroller } from './internal/auto-scroll.js'
 import { DndContext, type DndContextValue } from './internal/context.js'
-import { DragInstructions } from './internal/live-region.js'
+import { DndLiveRegion, DragInstructions } from './internal/live-region.js'
 import { createDragStore } from './internal/store.js'
 import { keyboardSensor } from './keyboard-sensor.js'
 import { pointerSensor } from './pointer-sensor.js'
 import type {
   CollisionDetection,
   DndAccessibility,
+  DndAnnouncements,
   DndMonitorListeners,
   DragCancelEvent,
   DragEndEvent,
@@ -82,6 +84,11 @@ export const DndProvider = ({
   const instructionsId = useId()
 
   const instructions = accessibility?.instructions ?? DEFAULT_INSTRUCTIONS
+  const overriddenAnnouncements = accessibility?.announcements
+  const announcements = useMemo<DndAnnouncements>(
+    () => ({ ...DEFAULT_ANNOUNCEMENTS, ...overriddenAnnouncements }),
+    [overriddenAnnouncements],
+  )
   const draggableRoleDescription =
     accessibility?.draggableRoleDescription ?? DEFAULT_ROLE_DESCRIPTION
 
@@ -137,6 +144,7 @@ export const DndProvider = ({
     <DndContext value={contextValue}>
       {children}
       <DragInstructions id={instructionsId} text={instructions} />
+      <DndLiveRegion store={store} announcements={announcements} />
     </DndContext>
   )
 }
