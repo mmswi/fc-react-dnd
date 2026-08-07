@@ -56,7 +56,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 - [x] [T4.2](tasks/T4.2-use-draggable.md) — `src/use-draggable.ts`
 - [x] [T4.3](tasks/T4.3-use-droppable.md) — `src/use-droppable.ts`
 - [x] [T4.4](tasks/T4.4-use-active-drag-and-monitor.md) — `src/use-active-drag.ts` + `src/use-dnd-monitor.ts`
-- [ ] [T4.5](tasks/T4.5-react-api-component-tests.md) — component tests: lifecycle, granularity, StrictMode
+- [x] [T4.5](tasks/T4.5-react-api-component-tests.md) — component tests: lifecycle, granularity, StrictMode
 
 ## P5 — Sensors
 
