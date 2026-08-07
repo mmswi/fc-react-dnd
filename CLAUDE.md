@@ -1,6 +1,6 @@
 # fc-react-dnd
 
-A React drag-and-drop library written from scratch. Performance, maintainability, and readability are the product; bundle size is explicitly not a current concern. MIT licensed. Zero runtime dependencies — `react` and `react-dom` are peer dependencies (>= 18).
+A React drag-and-drop library written from scratch. Performance, maintainability, and readability are the product; bundle size is explicitly not a current concern. MIT licensed. Zero runtime dependencies — `react` and `react-dom` are peer dependencies (**>= 19**; React 19 is the only tested target — see `.claude/ANALYSIS.md` § A8).
 
 **Scope (locked with the user):** sortable list, pointer + keyboard sensors, exactly one collision strategy (`closestCenter`), a drag overlay — and one hard thing done deeply: **first-class tree drag-and-drop** (drop-into vs drop-between, depth projection during drag, cycle prevention) as pure, Node-tested functions. Every general-purpose React DnD library stops at the same boundary: it reports what gesture you made relative to *one row*, and leaves you to compute the actual outcome. This library returns the outcome — `(parentId, index, depth)`, clamped against both neighbours, with the active subtree excluded so a cycle cannot be expressed. That's the differentiator; see `.claude/ANALYSIS.md` § A2 for the evidence and § A1 for why the boundary exists. Deliverables around the code: a StrictMode-clean demo, a React Profiler render-count comparison against dnd-kit, and a technical blog post — **the blog post is the actual artifact; the library is the evidence for it.**
 
@@ -78,7 +78,7 @@ Headless, store-first. All drag state lives in a plain external store (`src/inte
 | `sortable-list` | `src/sortable-list.tsx` | `SortableList`, `SortableListProps` (per-list context + `onSortEnd`) |
 | `use-sortable` | `src/use-sortable.ts` | `useSortable`, `UseSortableOptions`, `UseSortableResult` |
 | `tree` | `src/tree.ts` | **Pure tree math**: `flattenTree`, `projectTreeDrop`, `applyTreeDrop`, tree types |
-| `use-tree-drop` | `src/use-tree-drop.ts` | `useTreeDrop` — live `TreeDropProjection`, re-renders only when the projection changes |
+| `use-tree-drop` | `src/use-tree-drop.ts` | `useTreeDrop` — live `TreeDropProjection` + `getRowProps(id)` row wiring (rows are measure-only, never droppables); re-renders only when the projection changes |
 | `types` | `src/types.ts` | Shared public types (`DndId`, events, `Sensor`, `CollisionDetection`, …) |
 
 `src/internal/*` (store, context, geometry, list projection, auto-scroll, live region, announcements, DOM helpers, `use-store-selector`) is private: it is not in the `exports` map, so Node and TypeScript refuse deep imports. Internal modules import each other directly — never through any re-export hub.

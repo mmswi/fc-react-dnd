@@ -103,6 +103,19 @@ acceptance criteria hold **and** `bun run verify` is green.
 No task files — promote an entry to a task (TOC line + file) before coding it.
 
 - Cross-list sortable moves (kanban) as a first-class API
+- Cross-**tree** moves (drag between two trees; v0.1 guards with a null projection — § A7 F10)
+- Band-boundary hysteresis for the tree projection (pure shape: `projectTreeDrop` takes the
+  previous projection and applies a switching threshold — § A7)
+- Live-reflow tree mode (rows translating during a tree drag; v0.1 is indicator-only — § A7)
+- Op-shaped `applyTreeDrop` return (a `move`-op description alongside the new tree, for
+  consumer undo/redo — § A5)
+- Built-in auto-expand helper (user, 2026-08-08): `autoExpand: { delayMs }` on `useTreeDrop`,
+  wrapping the § A7 F8 recipe. Constraints for whoever builds it: **callback-shaped** —
+  the consumer owns collapse state, so the helper emits expand requests (projection stable
+  on the same collapsed nestable node for `delayMs`) and hands back the set of
+  auto-expanded ids **only in `onDragEnd`/`onDragCancel`** for restoration (restoring
+  mid-drag = removal = cancel, per A6); timers torn down on end/cancel; delay a named
+  constant, no bare literals
 - Additional collision strategies (`rectIntersection`, `pointerWithin`)
 - Drop animation for `DragOverlay` (animate to final/origin rect)
 - `portalContainer` prop for overlay + live region

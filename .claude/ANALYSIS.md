@@ -250,12 +250,12 @@ That is the sentence [T10.5](tasks/T10.5-blog-post.md) should be built around.
 (commit `1dd4ecb`). Citations are `path:line` into the React **source**, not `node_modules`
 (which holds built output where line numbers won't match).*
 
-> **Version caveat, and it matters.** `package.json` will declare `react`/`react-dom` peers
-> at `>=18`. These citations are 19.2.8 only. File and symbol names survive across 19.2.x;
-> **line numbers survive nothing.** On any other version, grep the symbol rather than
-> trusting the line. The `useSyncExternalStore` mechanism below has been stable since 18,
-> but [T9.1](tasks/T9.1-integration-pointer-flow.md)-style render-count assertions should be
-> run against both 18 and 19 before the blog post quotes numbers.
+> **Version caveat** *(updated 2026-08-08 — § A8 made React 19 the only target, which
+> simplifies this)*: these citations are 19.2.8, and 19.x is now the tested line, so they
+> cite the target's own source. File and symbol names survive across 19.2.x; **line numbers
+> survive nothing** — on another 19.x patch, grep the symbol rather than trusting the line.
+> The original both-18-and-19 assertion-run recommendation is dropped: render counts are
+> measured on 19 only, and no 18 behaviour may be claimed anywhere ([T9.1](tasks/T9.1-integration-pointer-flow.md), [T10.5](tasks/T10.5-blog-post.md)).
 
 ### A3.1 — An unchanged slice never enters React at all
 
@@ -473,6 +473,10 @@ performance optimum coincide, which is rare and worth saying out loud.
 
 Combining perf invariant 9 (memoize once per store-state version) with the `DragOverlay`
 technique from [T6.1](tasks/T6.1-drag-overlay.md):
+
+*(Corrected by § A7 F7: this table omitted collision — `closestCenter` over all collidable
+droppables per move, O(D). With D3's measure-only rows, D ≈ 0 for tree drags, so the table
+below stands; for a design where rows were real droppables it would be the dominant term.)*
 
 | Per pointermove | Cost |
 | --- | --- |
@@ -860,3 +864,172 @@ Announcement mapping ([T6.3](tasks/T6.3-accessibility-internals.md)): `'escape'`
 and `'pointer-cancelled'` share the ordinary "movement cancelled" text — from the user's point
 of view the drag simply stopped. `'item-removed'` needs its own, because that text would be a
 lie.
+
+---
+
+## A7 — Adversarial review: is the tree spec actually final?
+
+*Reviewed 2026-08-08 at the user's request, deliberately hostile, over the fresh state of
+A1–A6 and the P8/P3/P5 task files. Question: if T8.1/T8.2 were implemented exactly as
+written, would the result actually solve nested DnD?*
+
+> **Verdict: no — the architecture survives, but the tree spec had eleven holes, four of
+> them in the math that is the project's whole differentiator.** All are fixed in the task
+> files as of this entry. The distance from "final" was not in the big ideas (store-first,
+> single projection, pure math, removal-cancels — all held up); it was in exactly the
+> boundary conditions the corrected A2 claim brags about handling.
+
+### Decisions made by the user in this review
+
+**D1 — Position follows the drop point (WYSIWYG placement).** Demonstrated on an Archbee
+sidebar: a doc dropped in the gap under "Untitled" at one depth deeper lands as Untitled's
+child *at that visible position*. The gap you drop in, at the depth you indicated, IS the
+`(parentId, index)` — no separate placement rule. `mode: 'into'` (the middle band on a
+nestable row) resolves to **index 0**, because the drop point is adjacent to the parent row
+and that is the only position the principle can mean when children are hidden or absent.
+This also unifies the model: on an expanded parent, 'into' and "the gap below it at
+depth+1" are the *same position*, so the keyboard depth ladder is total.
+
+**D2 — Any node can be a parent.** Not folders: documents that gain a `children` array when
+their first child arrives. `canNest(candidateParent, active)` defaults to always-true, takes
+both nodes, and `applyTreeDrop` must create the `children` array immutably on a childless
+target (and leaves `children: []` behind when the last child moves out — documented, not
+deleted).
+
+**D3 — Rows are not droppables.** Tree rows register **measure-only** through
+`useTreeDrop`'s `getRowProps(id)`: rect cached for the projection and keyboard targeting,
+excluded from collision. One hook, no new subpath, no way to hold it wrong.
+
+### The findings
+
+**F1 — The clamp ignored `canNest`.** `[next.depth, prev.depth + 1]` is quoted everywhere,
+but depth `prev.depth + 1` in a between-gap *is* nesting into `prev` — without the into-band
+ever being consulted. Upper bound must be canNest-aware:
+`canNest(prev, active) ? prev.depth + 1 : prev.depth`.
+
+**F2 — No representation for "no legal position here."** With F1 fixed, the clamp interval
+can be **empty**: the gap between a node and its own first visible child (`next.depth =
+prev.depth + 1`) when `canNest(prev, active)` is false. The projection needs a null/blocked
+outcome; the indicator hides; releasing there is an `onDragEnd` with a null projection (a
+no-move, matching flat DnD's `over: null`), not a cancel.
+
+**F3 — `parentId`/`index` derivation was never stated.** The differentiator is returning the
+tuple, and no rule said how depth becomes a parent. Now specified: `depth = prev.depth + 1`
+→ parent is `prev`, index 0 (D1); `depth ≤ prev.depth` → parent is prev's ancestor at
+`depth - 1` (O(depth) via the reverse index), index = sibling-index of prev's
+ancestor-or-self at `depth`, plus one. When `next.depth === depth` this must equal "before
+next" — an equality worth a dedicated test.
+
+**F4 — The active row was a legal neighbour.** `flattenTree` excluded only the active
+node's *descendants*, so the active row itself could be `prev` — and `prev.depth + 1` then
+means nesting into yourself: a cycle reachable through the front door, with the defensive
+guard in `applyTreeDrop` as the only thing catching it. Fix: the math rows exclude the
+active node **and** descendants; the two gaps around its origin merge into one no-op
+position; `applyTreeDrop` of a no-op returns the **same `items` reference** (structural
+sharing's degenerate case, and a test).
+
+**F5 — Boundary gaps unspecified.** Top gap (no `prev`): depth is pinned to `next.depth`
+(root-first flatten makes that 0). Bottom gap (no `next`): clamp is `[0, canNest-aware
+max]`. Both get tests; both were previously undefined behaviour.
+
+**F6 — T8.2's memo rule was self-contradictory.** It demanded "key on the store state
+object, **never on the consumer's tree data**" — but the projection is a *function of* the
+consumer's rows. Keyed on state alone, an auto-expand mid-drag (new rows, possibly no new
+state) returns a stale projection *by construction*. Fix, preserving both safety properties:
+**two-level memo** — outer WeakMap on the per-provider state object (the A5 collision
+safety), inner WeakMap on the rows array identity (staleness safety). Three supporting
+requirements: `items` must be referentially stable across renders (consumer contract,
+documented — the A4.3 footgun again); rows that mounted but are not yet measured are
+excluded from candidates until the rect cache has them; and the T3.1 structural path must
+mint a **new state version** even when `over` is unchanged, so projections recompute after
+an insertion (gate 1 keeps unchanged-slice subscribers from rendering, so this is cheap).
+
+**F7 — Two sources of truth.** Rows as real droppables meant `closestCenter` ran over all N
+rows per move, producing an `over` that *disagrees with the projection* — A1's own thesis
+("element hit-testing is the wrong question for trees") running as dead code on the hot
+path. A4's cost table also silently omitted this O(collidable) per-move term. Resolved by
+D3: measure-only rows, no `isOver`, collision cost for trees ~0, and `over`-driven
+announcements replaced by projection-driven ones (F9).
+
+**F8 — Spring-loaded collapse fights the cancel policy.** Auto-expand-on-hover mounts rows
+(insertion — survives, by design). But *restoring* the collapse mid-drag unmounts them —
+removal — **cancel**, per A6. The recipe is therefore: expand on hover during the drag;
+restore collapse state only in `onDragEnd`/`onDragCancel`. A collaborator collapsing a
+branch mid-drag cancels your drag — that is the policy working, not a bug. Recipe goes in
+the demo and README; T9.3 tests both directions.
+
+**F9 — Tree accessibility had no spec.** Two additions. **Reachability invariant**: every
+legal outcome — each gap at each legal depth, and 'into' on nestable rows — must be
+reachable by keyboard alone; the test enumerates targets and drives arrow keys. (Without
+D1's unification this would have needed a separate keyboard rule for 'into'; with it, 'into'
+is the deepest rung of the gap below the row.) **Announcements**: tree drags announce from
+projection changes ("place inside Untitled" / "place after X, level 3"), since measure-only
+rows produce no `over` events; texts overridable like all others; `aria-level` /
+`aria-posinset` / `aria-setsize` recipe goes in the README.
+
+**F10 — Cross-tree scoping undefined.** An `activeId` that is not in this tree's `items`
+yields a **null projection** (guard, tested). Cross-tree moves join the Backlog beside
+cross-list.
+
+**F11 — The retired phrase survived in T8.1.** Its Goal still said "the ecosystem punts on
+this case" — the A2 sweep grepped for "punts on the tree" and missed this variant. Fixed to
+the corrected claim. Lesson consistent with this file's method: sweeps need the loose match,
+not the exact phrase.
+
+### Scope statements this review adds
+
+- **v0.1 tree mode is indicator-only.** Rows do not translate live during a tree drag (that
+  is the sortable list's model); the projection drives one indicator. Live reflow in trees →
+  Backlog.
+- Backlog additions: band-boundary **hysteresis** (pure shape: `projectTreeDrop` takes the
+  previous projection and applies a switching threshold — still pure); **cross-tree moves**;
+  **live-reflow tree mode**; **op-shaped `applyTreeDrop` return** for undo/redo (A5's open
+  question, now parked deliberately).
+
+### What "final" means now
+
+With F1–F11 landed, the tree spec is **final at the specification level**: every function
+has stated semantics for every input class the review could construct, every decision is
+either made (D1–D3, A6) or explicitly parked in the Backlog, and the remaining `[open]`
+items are *measurements* that only implementation can supply (selector floor, binary-search
+validity, tearing cost, react-arborist/react-complex-tree comparison, Pragmatic's internal
+clamp). Those are gates on the **blog post's claims**, not on starting P1/P2.
+
+---
+
+## A8 — Decided (user, 2026-08-08): React 19+ is the target
+
+*"Make this work on React 19, and not 18. If it works on 18, good, but 19+ is the target."*
+
+**Peer range: `>=19.0.0`.** Not `>=18` — a peer range is a support statement read by every
+consumer's package manager, and declaring 18 while testing exclusively on 19 would be an
+untested claim in the manifest, exactly the class of thing this project's rules exist to
+prevent ("if it works on 18, good" cannot be encoded honestly as `>=18`). Consumers on 18
+can override peers at their own risk; we do not claim it, test it, or document it.
+
+### What it simplifies
+
+- **A3's citations now cite the target's own source.** The version caveat shrinks to
+  "line numbers don't survive patch releases"; the both-18-and-19 measurement matrix is
+  gone (edited in place in A3).
+- **One React in CI and devDependencies** (`^19.x`, `@types/react` 19,
+  `@testing-library/react` ≥ 16.1 — the React-19-compatible line).
+- **No 18-conditional code paths, ever** — no feature detection, no dual documentation.
+
+### What it unlocks — flagged for implementation, not decided here
+
+**Ref callback cleanup functions are 19-only, and they are the natural fit for
+registration.** A ref callback may return a cleanup in React 19; attach → register,
+cleanup → unregister, no `useEffect` in the loop. That is one fewer effect per
+draggable/droppable/row, registration available at commit time (before layout effects),
+and the StrictMode attach/detach/attach cycle exercises exactly the idempotency perf
+invariant 8 demands. The current spec language ("registration happens in effects" —
+`CLAUDE.md` § Architecture, [T4.2](tasks/T4.2-use-draggable.md)/[T4.3](tasks/T4.3-use-droppable.md))
+predates this decision. **Whoever builds T4.2/T4.3 — and T8.2's `getRowProps` — must
+evaluate ref-cleanup registration against effect registration and record the choice in the
+task file.** The invariants are mechanism-agnostic and unchanged either way: idle
+registration never notifies (5), teardown is complete (7), StrictMode-clean (8).
+
+Nothing else in React 19 changes the design: no `use()`, actions, or optimistic state
+anywhere near this library's needs; `useSyncExternalStore` semantics are the A3-verified
+ones.
