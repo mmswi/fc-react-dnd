@@ -72,6 +72,18 @@ export const DRAG_DIRECTIONS = {
 /** The step a keyboard drag takes. Vertical steps change target; horizontal steps change depth. */
 export type DragDirection = (typeof DRAG_DIRECTIONS)[keyof typeof DRAG_DIRECTIONS]
 
+/**
+ * The half of a drag that does not move: which item, what it carried, and where it sat when the
+ * drag began. `useActiveDrag` returns this, and its identity survives every pointermove — which
+ * is what keeps a component reading it from re-rendering at pointer frequency.
+ */
+export type ActiveDragInfo = {
+  readonly id: DndId
+  readonly data: DndData
+  /** Where the item sat when the drag began. */
+  readonly rect: Rect
+}
+
 export type DragActive = {
   readonly id: DndId
   readonly data: DndData

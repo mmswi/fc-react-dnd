@@ -1,4 +1,5 @@
 import type {
+  ActiveDragInfo,
   CollisionDetection,
   DirectionalTarget,
   DndData,
@@ -67,16 +68,13 @@ type DroppableRegistration = {
 }
 
 /**
- * The half of a drag that does not move: which item, what it carried, where it started.
+ * The public `ActiveDragInfo` plus where the pointer started.
  *
  * Kept separate from the translate on purpose. A component selecting `origin` must not
  * re-render 120 times a second, and it does not, because this object's identity survives
  * every move.
  */
-export type DragOrigin = {
-  readonly id: DndId
-  readonly data: DndData
-  readonly rect: Rect
+export type DragOrigin = ActiveDragInfo & {
   /** `null` for a drag with no pointer — see `ANALYSIS.md` § A9.2. */
   readonly pointer: Point | null
 }

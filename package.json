@@ -33,6 +33,14 @@
     "./use-droppable": {
       "types": "./dist/use-droppable.d.ts",
       "default": "./dist/use-droppable.js"
+    },
+    "./use-active-drag": {
+      "types": "./dist/use-active-drag.d.ts",
+      "default": "./dist/use-active-drag.js"
+    },
+    "./use-dnd-monitor": {
+      "types": "./dist/use-dnd-monitor.d.ts",
+      "default": "./dist/use-dnd-monitor.js"
     }
   },
   "scripts": {
