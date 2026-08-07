@@ -200,7 +200,7 @@ describe('render granularity across a realistic tree — perf invariant 4', () =
 })
 
 describe('callback order and payloads', () => {
-  it('fires start, over, move, and end in order for one pointer drag', () => {
+  it('fires start, move, over, and end in that order for one pointer drag', () => {
     const sequence: string[] = []
     const scene = renderRows({
       onDragStart: () => sequence.push('start'),

@@ -101,6 +101,15 @@ export type DragOver = {
 
 export type DragStartEvent = {
   readonly active: DragActive
+  /**
+   * What the drag began over, if anything.
+   *
+   * A drag frequently starts already over a target — a sortable row is over itself. Reporting it
+   * here rather than as an immediate `onDragOver` keeps a consumer that tracks the target from
+   * `onDragOver` alone from starting one target behind, without the second event stepping on the
+   * pickup announcement.
+   */
+  readonly over: DragOver | null
 }
 
 export type DragMoveEvent = {

@@ -486,7 +486,14 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
       sessionToken += 1
       const session = createSession(sessionToken)
 
-      emit('onDragStart', { active: buildActive(origin, ZERO_TRANSLATE) } satisfies DragStartEvent)
+      // The initial target rides on the start event rather than arriving as a separate
+      // `onDragOver` right behind it. A consumer treating `onDragOver` as the single source of
+      // "current target" must not start blind — but firing both would also overwrite the pickup
+      // announcement with a target announcement before a screen reader could speak it.
+      emit('onDragStart', {
+        active: buildActive(origin, ZERO_TRANSLATE),
+        over: buildOver(),
+      } satisfies DragStartEvent)
       notify()
 
       return session

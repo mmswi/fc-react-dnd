@@ -16,7 +16,7 @@ const cancelTextFor = (reason: DragCancelReason) =>
 
 describe('DEFAULT_ANNOUNCEMENTS', () => {
   it('names the item on pickup and says how to continue', () => {
-    const text = DEFAULT_ANNOUNCEMENTS.describeDragStart({ active })
+    const text = DEFAULT_ANNOUNCEMENTS.describeDragStart({ active, over: null })
 
     expect(text).toContain('Invoices')
     expect(text).toMatch(/arrow keys/i)

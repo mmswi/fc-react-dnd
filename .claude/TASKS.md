@@ -83,8 +83,8 @@ acceptance criteria hold **and** `bun run verify` is green.
 
 ## P9 — Integration & verification
 
-- [ ] [T9.1](tasks/T9.1-integration-pointer-flow.md) — integration: full pointer flow
-- [ ] [T9.2](tasks/T9.2-integration-keyboard-flow.md) — integration: full keyboard flow
+- [x] [T9.1](tasks/T9.1-integration-pointer-flow.md) — integration: full pointer flow
+- [x] [T9.2](tasks/T9.2-integration-keyboard-flow.md) — integration: full keyboard flow
 - [ ] [T9.3](tasks/T9.3-edge-cases.md) — edge cases: disabled, Escape, unmount mid-drag, second pointer
 - [ ] [T9.4](tasks/T9.4-build-and-package-checks.md) — `bun run build` emits a working `dist/`; publint + attw clean
 - [ ] [T9.5](tasks/T9.5-playground-app.md) — `playground/` Vite app: sortable, tree, dnd-kit comparison
