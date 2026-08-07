@@ -32,11 +32,11 @@ acceptance criteria hold **and** `bun run verify` is green.
 
 - [x] [T1.1](tasks/T1.1-npm-name-availability.md) — confirm `fc-react-dnd` is free on the npm registry
 - [x] [T1.2](tasks/T1.2-package-json.md) — `package.json`: ESM-only, subpath `exports`, bun workspaces, bun scripts
-- [ ] [T1.3](tasks/T1.3-tsconfig.md) — `tsconfig.json` + `tsconfig.build.json`
-- [ ] [T1.4](tasks/T1.4-biome-and-vitest-config.md) — `biome.json` + `vitest.config.ts`; delete the ESLint/Prettier/pnpm files
-- [ ] [T1.5](tasks/T1.5-test-harness.md) — `test/setup.ts` and `test/helpers.ts`
-- [ ] [T1.6](tasks/T1.6-install-green.md) — `bun install` clean; typecheck / check / test all run empty-green
-- [ ] [T1.7](tasks/T1.7-ci-workflow.md) — CI workflow running `bun run verify`
+- [x] [T1.3](tasks/T1.3-tsconfig.md) — `tsconfig.json` + `tsconfig.build.json`
+- [x] [T1.4](tasks/T1.4-biome-and-vitest-config.md) — `biome.json` + `vitest.config.ts`; delete the ESLint/Prettier/pnpm files
+- [x] [T1.5](tasks/T1.5-test-harness.md) — `test/setup.ts` and `test/helpers.ts`
+- [x] [T1.6](tasks/T1.6-install-green.md) — `bun install` clean; typecheck / check / test all run empty-green
+- [x] [T1.7](tasks/T1.7-ci-workflow.md) — CI workflow running `bun run verify`
 
 ## P2 — Core primitives (pure, no React, Node-testable)
 
