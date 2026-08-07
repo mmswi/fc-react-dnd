@@ -1,0 +1,83 @@
+import type { Translate } from '../types.js'
+import { type DndId, DRAG_DIRECTIONS, type DragDirection, type Point, type Rect } from '../types.js'
+
+/**
+ * Pure rect arithmetic. Everything expensive in this library reduces to this file: rects are
+ * read from the DOM once at drag start and every move afterwards is arithmetic against the
+ * cache, so nothing here may touch `document`, `window`, or React.
+ */
+
+export type RectCandidate = {
+  readonly id: DndId
+  readonly rect: Rect
+}
+
+export const centerOf = (rect: Rect): Point => ({
+  x: rect.left + rect.width / 2,
+  y: rect.top + rect.height / 2,
+})
+
+export const translateRect = (rect: Rect, translate: Translate): Rect => ({
+  top: rect.top + translate.y,
+  left: rect.left + translate.x,
+  width: rect.width,
+  height: rect.height,
+})
+
+export const distanceBetweenPoints = (a: Point, b: Point): number =>
+  Math.hypot(b.x - a.x, b.y - a.y)
+
+/**
+ * How much harder a sideways offset counts than distance along the direction of travel.
+ *
+ * Above 1, an aligned candidate beats a euclidean-closer one that drifts off the axis — which
+ * is what makes ArrowDown feel like "the next item down" instead of "the nearest thing that
+ * happens to be lower". Only the ordering matters, not the exact figure.
+ */
+const CROSS_AXIS_PENALTY = 2
+
+type Axis = { readonly main: 'x' | 'y'; readonly cross: 'x' | 'y'; readonly sign: 1 | -1 }
+
+const AXIS_BY_DIRECTION: Record<DragDirection, Axis> = {
+  [DRAG_DIRECTIONS.up]: { main: 'y', cross: 'x', sign: -1 },
+  [DRAG_DIRECTIONS.down]: { main: 'y', cross: 'x', sign: 1 },
+  [DRAG_DIRECTIONS.left]: { main: 'x', cross: 'y', sign: -1 },
+  [DRAG_DIRECTIONS.right]: { main: 'x', cross: 'y', sign: 1 },
+}
+
+/**
+ * The nearest candidate **in a direction** — the keyboard's "next item over".
+ *
+ * Filtering by direction happens before scoring, so a candidate behind the movement can never
+ * win however close it is. Ties keep the first candidate in the array, which is registration
+ * order, so the same tree always produces the same keyboard path.
+ */
+export const findNearestRectInDirection = (args: {
+  readonly from: Rect
+  readonly direction: DragDirection
+  readonly candidates: readonly RectCandidate[]
+}): RectCandidate | null => {
+  const { from, direction, candidates } = args
+  const axis = AXIS_BY_DIRECTION[direction]
+  const origin = centerOf(from)
+
+  let best: RectCandidate | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+
+  for (const candidate of candidates) {
+    const center = centerOf(candidate.rect)
+    const alongDirection = (center[axis.main] - origin[axis.main]) * axis.sign
+    const isAhead = alongDirection > 0
+    if (!isAhead) continue
+
+    const offAxisDistance = Math.abs(center[axis.cross] - origin[axis.cross])
+    const score = alongDirection + offAxisDistance * CROSS_AXIS_PENALTY
+
+    if (score < bestScore) {
+      best = candidate
+      bestScore = score
+    }
+  }
+
+  return best
+}
