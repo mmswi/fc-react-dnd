@@ -92,7 +92,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 
 ## P10 — Docs & the artifact
 
-- [ ] [T10.1](tasks/T10.1-readme.md) — `README.md`
+- [x] [T10.1](tasks/T10.1-readme.md) — `README.md`
 - [ ] [T10.2](tasks/T10.2-changelog.md) — `CHANGELOG.md`, `0.1.0`
 - [ ] [T10.3](tasks/T10.3-npm-pack-dry-run.md) — `npm pack --dry-run` reviewed
 - [ ] [T10.4](tasks/T10.4-final-standards-sweep.md) — final `mihai-coding-standards` sweep over the whole diff
