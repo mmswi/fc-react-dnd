@@ -81,6 +81,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 - [x] [T8.1](tasks/T8.1-tree-math.md) — `src/tree.ts` + exhaustive tests: flatten, project, apply
 - [x] [T8.2](tasks/T8.2-use-tree-drop.md) — `src/use-tree-drop.ts` + tests
 - [x] [T8.3](tasks/T8.3-un-nesting.md) — Dragging left lifts a row out of its parent (§ A10)
+- [x] [T8.4](tasks/T8.4-drop-indicator.md) — `TreeDropProjection.indicator`: the library resolves the screen-space anchor
 
 ## P9 — Integration & verification
 

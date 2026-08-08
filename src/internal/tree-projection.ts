@@ -117,6 +117,9 @@ export const treeProjectionsAreEqual = (
     a.depth === b.depth &&
     a.mode === b.mode &&
     a.afterId === b.afterId &&
-    a.beforeId === b.beforeId
+    a.beforeId === b.beforeId &&
+    a.indicator.rowId === b.indicator.rowId &&
+    a.indicator.edge === b.indicator.edge &&
+    a.indicator.depth === b.indicator.depth
   )
 }

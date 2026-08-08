@@ -1248,10 +1248,11 @@ immediately below the ancestor's own row — several rows above where the docume
 appear. So even the un-nests that *did* work looked like they had gone somewhere else.
 
 Fixed in the playground by advancing the anchor to the last row of its subtree (in a flattened
-tree, the rows that follow it while staying deeper). **Open question for the API:** every
-consumer drawing an indicator needs this same walk, which is an argument for the library
-returning the visual anchor rather than only the sibling one. Parked, not decided — it is an
-API addition and needs its own task.
+tree, the rows that follow it while staying deeper). **Resolved by T8.4** (same day): after the
+demo mis-derived the anchor a third time — the `into` box landing on the target's first child,
+because `into` sets `beforeId` to that child — the projection now carries
+`indicator: { rowId, edge, depth }`, the screen-space anchor resolved by the library. Three
+failures by the best-placed consumer settled the question.
 
 ### Method note
 

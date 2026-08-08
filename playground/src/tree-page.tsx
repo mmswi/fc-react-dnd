@@ -3,6 +3,7 @@ import { DragOverlay } from 'fc-react-dnd/drag-overlay'
 import {
   applyTreeDrop,
   flattenTree,
+  type TreeIndicatorEdge,
   type TreeItem,
   type TreeNestPredicate,
 } from 'fc-react-dnd/tree'
@@ -45,22 +46,11 @@ const INITIAL_TREE: readonly TreeItem<Doc>[] = [
 ]
 
 /** Everything can be a parent — except, for the demo, one deliberately locked document. */
-const canNest: TreeNestPredicate = (candidateParent) => candidateParent.id !== 'on-call'
+const LOCKED_ID = 'on-call'
+const canNest: TreeNestPredicate = (candidateParent) => candidateParent.id !== LOCKED_ID
 
-/**
- * The last visible row belonging to the row at `index` — itself when it has no visible children.
- *
- * Descendants are exactly the rows that follow it while staying deeper than it, which is the one
- * fact a flattened tree gives you for free.
- */
-const lastRowOfSubtree = (rows: readonly { depth: number }[], index: number): number => {
-  if (index < 0) return index
-
-  const depth = rows[index]?.depth ?? 0
-  let last = index
-  while (last + 1 < rows.length && (rows[last + 1]?.depth ?? 0) > depth) last++
-  return last
-}
+/** Wider middle band than the library default — these rows are only 34px tall. */
+const NEST_BAND_FRACTION = 0.25
 
 const TreeBoard = () => {
   const [items, setItems] = useState(INITIAL_TREE)
@@ -79,6 +69,7 @@ const TreeBoard = () => {
     items,
     collapsedIds,
     indentPx: INDENT_PX,
+    nestBandFraction: NEST_BAND_FRACTION,
     canNest,
   })
 
@@ -152,21 +143,11 @@ const TreeBoard = () => {
     })
   }
 
-  /**
-   * Which row the indicator hangs off, and on which side.
-   *
-   * `afterId` means "below that row"; with no `afterId`, `beforeId` means "above that row" — not
-   * below it. An `into` projection sits on the parent row itself.
-   *
-   * The row it follows among its **siblings** is not the row it follows **on screen**: lifting a
-   * document out to the root lands it after that ancestor's entire visible subtree. Drawing the
-   * line straight after the ancestor's own row puts it several rows above where the document
-   * would really appear, which is what makes an un-nest look like the tree ignoring the drag.
-   */
-  const indicatorAnchorId = projection?.afterId ?? projection?.beforeId ?? projection?.parentId
-  const anchorRow = rows.findIndex((row) => String(row.id) === String(indicatorAnchorId))
-  const indicatorSitsBelowItsAnchor = projection?.afterId != null
-  const indicatorRow = indicatorSitsBelowItsAnchor ? lastRowOfSubtree(rows, anchorRow) : anchorRow
+  // The projection names the screen row to draw against — deriving it from the sibling ids is
+  // the trap this demo fell into three times before the library started answering it (§ A10).
+  const indicatorRow = projection
+    ? rows.findIndex((row) => String(row.id) === String(projection.indicator.rowId))
+    : -1
 
   return (
     <section>
@@ -218,6 +199,11 @@ const TreeBoard = () => {
                     }}
                   >
                     {titleById.get(id) ?? id}
+                    {id === LOCKED_ID ? (
+                      <span title="Declines children" aria-hidden="true">
+                        {' 🔒'}
+                      </span>
+                    ) : null}
                   </button>
                 </div>
               </li>
@@ -225,12 +211,11 @@ const TreeBoard = () => {
           })}
         </ul>
 
-        {projection ? (
+        {projection && indicatorRow !== -1 ? (
           <TreeIndicator
-            mode={projection.mode}
-            depth={projection.depth}
+            edge={projection.indicator.edge}
+            depth={projection.indicator.depth}
             rowIndex={indicatorRow}
-            below={indicatorSitsBelowItsAnchor}
           />
         ) : null}
       </div>
@@ -245,7 +230,11 @@ const TreeBoard = () => {
         <TreeDragPreview
           titleById={titleById}
           depth={projection?.depth ?? 0}
-          mode={projection?.mode}
+          parentTitle={
+            projection?.parentId != null
+              ? (titleById.get(String(projection.parentId)) ?? String(projection.parentId))
+              : null
+          }
         />
       </DragOverlay>
 
@@ -259,23 +248,25 @@ const TreeBoard = () => {
 }
 
 /**
- * What the cursor carries, showing the two things the indicator alone cannot: which document is
- * in hand, and — through the indent — the depth it would land at.
+ * What the cursor carries: which document is in hand, the depth it would land at (the indent),
+ * and — whenever the drop lands *inside* something — the name of that parent. Naming the parent
+ * on every nesting drop, not only in the middle-band case, is what stops "the JSON says between
+ * but it became a child" from reading as a contradiction: both paths are drops into a parent.
  */
 const TreeDragPreview = ({
   titleById,
   depth,
-  mode,
+  parentTitle,
 }: {
   titleById: ReadonlyMap<string, string>
   depth: number
-  mode?: 'into' | 'between'
+  parentTitle: string | null
 }) => {
   const active = useActiveDrag()
   if (!active) return null
 
   const id = String(active.id)
-  const isNesting = mode === 'into'
+  const isNesting = parentTitle !== null
 
   return (
     <div
@@ -297,24 +288,26 @@ const TreeDragPreview = ({
     >
       <span aria-hidden="true">⠿</span>
       {titleById.get(id) ?? id}
-      {isNesting ? <span style={{ color: '#2563eb', fontSize: 12 }}>↳ into</span> : null}
+      {isNesting ? (
+        <span style={{ color: '#2563eb', fontSize: 12 }}>↳ into {parentTitle}</span>
+      ) : (
+        <span style={{ color: '#64748b', fontSize: 12 }}>top level</span>
+      )}
     </div>
   )
 }
 
 const TreeIndicator = ({
-  mode,
+  edge,
   depth,
   rowIndex,
-  below,
 }: {
-  mode: 'into' | 'between'
+  edge: TreeIndicatorEdge
   depth: number
   rowIndex: number
-  below: boolean
 }) => {
-  const isInto = mode === 'into'
-  const top = (rowIndex + (isInto || !below ? 0 : 1)) * ROW_HEIGHT_PX
+  const isOver = edge === 'over'
+  const top = (edge === 'below' ? rowIndex + 1 : rowIndex) * ROW_HEIGHT_PX
 
   return (
     <div
@@ -323,11 +316,11 @@ const TreeIndicator = ({
         position: 'absolute',
         left: depth * INDENT_PX + 20,
         right: 0,
-        top: Math.max(top, 0),
-        height: isInto ? ROW_HEIGHT_PX : 2,
-        background: isInto ? 'rgba(37,99,235,0.12)' : '#2563eb',
-        border: isInto ? '2px solid #2563eb' : undefined,
-        borderRadius: isInto ? 4 : 0,
+        top: isOver ? rowIndex * ROW_HEIGHT_PX : top,
+        height: isOver ? ROW_HEIGHT_PX : 2,
+        background: isOver ? 'rgba(37,99,235,0.12)' : '#2563eb',
+        border: isOver ? '2px solid #2563eb' : undefined,
+        borderRadius: isOver ? 4 : 0,
         pointerEvents: 'none',
       }}
     />

@@ -382,6 +382,65 @@ describe('projectTreeDrop — dragging left lifts a row out of its parent (§ A1
   })
 })
 
+describe('projectTreeDrop — the indicator names the screen row to draw against (§ A10)', () => {
+  // `afterId`/`beforeId` are sibling-space; a consumer drawing a line needs screen-space. Every
+  // consumer that derived one from the other got it wrong — three times in this repo alone — so
+  // the projection now carries the anchor ready to draw.
+
+  it('puts the into box on the parent row itself, not its first child', () => {
+    // 'guide' has visible children, so beforeId is 'install' — and an indicator anchored via
+    // beforeId lands the box on the child's row. The reported symptom was "into styling is not
+    // triggered always": it triggered, one row too low, precisely when the target had children.
+    const projection = project({ pointerY: centreOfRow(1) })
+
+    expect(projection?.mode).toBe('into')
+    expect(projection?.indicator).toEqual({ rowId: 'guide', edge: 'over', depth: 1 })
+  })
+
+  it('draws a plain gap under the row above it', () => {
+    const projection = project({ pointerY: topOfRow(3) + 1 })
+
+    expect(projection?.indicator).toEqual({ rowId: 'install', edge: 'below', depth: 2 })
+  })
+
+  it('draws the gap above the first row against that row', () => {
+    const projection = project({ pointerY: -5 })
+
+    expect(projection?.indicator).toEqual({ rowId: 'docs', edge: 'above', depth: 0 })
+  })
+
+  it('draws "first child via the gap" directly under the parent row', () => {
+    // The "says between, but goes into" screenshot: the drop makes the row a child of `guide`,
+    // and the old anchor chain fell through to the parent with the line drawn *above* it — an
+    // entirely different gap from where the row would land.
+    const projection = project({ pointerY: topOfRow(2) + 1, depthSteps: 2 })
+
+    expect(projection).toMatchObject({ parentId: 'guide', index: 0 })
+    expect(projection?.indicator).toEqual({ rowId: 'guide', edge: 'below', depth: 2 })
+  })
+
+  it('draws an un-nest below the whole subtree it lands after', () => {
+    // Lifting to the root from a gap inside `guide` lands after all of `docs`, so the line
+    // belongs under `api` — the last visible row of that subtree — not under the pointer.
+    const projection = project({ activeId: 'install', pointerY: topOfRow(2) + 1, depthSteps: -2 })
+
+    expect(projection).toMatchObject({ depth: 0, afterId: 'docs' })
+    expect(projection?.indicator).toEqual({ rowId: 'api', edge: 'below', depth: 0 })
+  })
+})
+
+describe('projectTreeDrop — a last child nests into the sibling above it', () => {
+  it('drops into the previous sibling from the middle band', () => {
+    // The user-reported gesture: 'usage' is the last child of 'guide', dragged over 'install'.
+    // In the demo it appeared broken because the row it was tried on was the demo's one locked
+    // node; the library itself has no such asymmetry.
+    const projection = project({ activeId: 'usage', pointerY: centreOfRow(2) })
+
+    expect(projection).toMatchObject({ parentId: 'install', mode: 'into', depth: 3 })
+    expect(projection?.indicator).toEqual({ rowId: 'install', edge: 'over', depth: 2 })
+  })
+})
+
 describe('projectTreeDrop — a gap with no legal depth is blocked (§ A7 F2)', () => {
   it('returns null between a node and its own first child when that node refuses to nest', () => {
     // Lower bound is install's depth (2); upper bound is guide's depth (1) because guide will
@@ -532,6 +591,8 @@ const projectionTo = (
   mode: 'between',
   afterId: null,
   beforeId: null,
+  // Screen-space drawing data — `applyTreeDrop` never reads it, so a placeholder is honest here.
+  indicator: { rowId: null, edge: 'above', depth: 0 },
   ...overrides,
 })
 

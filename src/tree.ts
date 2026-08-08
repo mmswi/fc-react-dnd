@@ -109,6 +109,34 @@ export type TreeDropMode = (typeof TREE_DROP_MODES)[keyof typeof TREE_DROP_MODES
  */
 export type TreeNestPredicate = (candidateParent: TreeRow, active: TreeRow) => boolean
 
+export const TREE_INDICATOR_EDGES = {
+  /** A line along the top edge of the row. */
+  above: 'above',
+  /** A line along the bottom edge of the row — of its whole visible subtree, already resolved. */
+  below: 'below',
+  /** A box over the row itself: the drop nests into it. */
+  over: 'over',
+} as const
+
+export type TreeIndicatorEdge = (typeof TREE_INDICATOR_EDGES)[keyof typeof TREE_INDICATOR_EDGES]
+
+/**
+ * Where to *draw* the drop — a screen-space anchor, ready for an indicator.
+ *
+ * `afterId`/`beforeId` are sibling-space, and deriving a drawable position from them is a trap
+ * every consumer walks into: `afterId` may be an ancestor whose subtree the line belongs below,
+ * an `into` target's `beforeId` is its first child, and "first child via the gap" has no
+ * neighbour ids at all. This repo's own demo got it wrong three times before the projection
+ * started answering the question itself.
+ */
+export type TreeDropIndicator = {
+  /** The visible row to anchor against; `null` only when the tree has no visible rows. */
+  readonly rowId: DndId | null
+  readonly edge: TreeIndicatorEdge
+  /** The indent to draw at — for `over`, the target row's own depth. */
+  readonly depth: number
+}
+
 /**
  * Where the drop would land. Not a gesture relative to one row — the resulting **position**.
  *
@@ -125,6 +153,7 @@ export type TreeDropProjection = {
   readonly afterId: DndId | null
   /** The sibling it lands before; `null` at the end of the sibling list. */
   readonly beforeId: DndId | null
+  readonly indicator: TreeDropIndicator
 }
 
 export type ProjectTreeDropArgs = {
@@ -154,6 +183,7 @@ const ROOT_PROJECTION: TreeDropProjection = {
   mode: TREE_DROP_MODES.between,
   afterId: null,
   beforeId: null,
+  indicator: { rowId: null, edge: TREE_INDICATOR_EDGES.above, depth: 0 },
 }
 
 type PositionedRow = {
@@ -182,6 +212,29 @@ const ancestorOrSelfAtDepth = (
     current = parent
   }
   return current
+}
+
+/**
+ * The last visible row of `anchor`'s subtree — `anchor` itself when it has none.
+ *
+ * A drop that lands *after* a node lands after everything under it, so this is the row the
+ * indicator line belongs below. Descendants are exactly the rows that follow the anchor while
+ * staying deeper, which is the one fact a flattened tree gives for free.
+ */
+const lastRowOfVisibleSubtree = (
+  positioned: readonly PositionedRow[],
+  anchor: TreeRow,
+): TreeRow => {
+  const start = positioned.findIndex((entry) => entry.row.id === anchor.id)
+  if (start === -1) return anchor
+
+  let last = start
+  while (last + 1 < positioned.length) {
+    const candidate = positioned[last + 1] as PositionedRow
+    if (candidate.row.depth <= anchor.depth) break
+    last += 1
+  }
+  return (positioned[last] as PositionedRow).row
 }
 
 /**
@@ -279,6 +332,9 @@ export const projectTreeDrop = (args: ProjectTreeDropArgs): TreeDropProjection |
       // The same id the gap below an expanded parent would produce. Without this the two
       // "same position" paths agree on the index and disagree the moment an edit shifts it.
       beforeId: firstChild?.row.id ?? null,
+      // The box goes on the target row at its own indent — anchoring via `beforeId` puts it on
+      // the target's first child instead, which reads as the into state not triggering at all.
+      indicator: { rowId: intoRow.id, edge: TREE_INDICATOR_EDGES.over, depth: intoRow.depth },
     }
   }
 
@@ -294,6 +350,7 @@ export const projectTreeDrop = (args: ProjectTreeDropArgs): TreeDropProjection |
       mode: TREE_DROP_MODES.between,
       afterId: null,
       beforeId: next.id,
+      indicator: { rowId: next.id, edge: TREE_INDICATOR_EDGES.above, depth: next.depth },
     }
   }
 
@@ -328,6 +385,11 @@ export const projectTreeDrop = (args: ProjectTreeDropArgs): TreeDropProjection |
       mode: TREE_DROP_MODES.between,
       afterId: null,
       beforeId: followsAtSameDepth ? next.id : null,
+      // Becoming the parent's first child means the line sits directly under the parent's own
+      // row. There may be no neighbour ids at all here, and an anchor chain that falls back to
+      // `parentId` with an "above" default draws in the gap above the parent — a different gap
+      // entirely, which is what "it says between, but goes into" looks like.
+      indicator: { rowId: prev.id, edge: TREE_INDICATOR_EDGES.below, depth },
     }
   }
 
@@ -339,6 +401,13 @@ export const projectTreeDrop = (args: ProjectTreeDropArgs): TreeDropProjection |
     mode: TREE_DROP_MODES.between,
     afterId: anchor.id,
     beforeId: followsAtSameDepth ? next.id : null,
+    // Landing after the anchor means landing after its whole subtree — for an un-nest this is
+    // rows away from the pointer, and drawing there is the truthful choice.
+    indicator: {
+      rowId: lastRowOfVisibleSubtree(positioned, anchor).id,
+      edge: TREE_INDICATOR_EDGES.below,
+      depth,
+    },
   }
 }
 
