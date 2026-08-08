@@ -96,7 +96,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 - [x] [T10.2](tasks/T10.2-changelog.md) — `CHANGELOG.md`, `0.1.0`
 - [x] [T10.3](tasks/T10.3-npm-pack-dry-run.md) — `npm pack --dry-run` reviewed
 - [x] [T10.4](tasks/T10.4-final-standards-sweep.md) — final `mihai-coding-standards` sweep over the whole diff
-- [ ] [T10.5](tasks/T10.5-blog-post.md) — **the blog post**, the actual artifact
+- [ ] [T10.5](tasks/T10.5-blog-post.md) — **the blog post**, the actual artifact (excluded from the 2026-08-08 implementation pass by the user; everything it depends on is done, and the outstanding inputs are the T9.6 GIF and a first green CI run — see those task files)
 
 ## Backlog (explicitly out of v0.1 scope)
 
