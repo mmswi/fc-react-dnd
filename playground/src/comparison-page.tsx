@@ -34,7 +34,7 @@ const ITEM_COUNT = 24
 const INITIAL_IDS = Array.from({ length: ITEM_COUNT }, (_unused, index) => `item-${index + 1}`)
 
 const OurRow = ({ id }: { id: string }) => {
-  const { setNodeRef, handleProps, isDragging, translate } = useSortable({ id })
+  const { setNodeRef, handleProps, isDragging, translate, transition } = useSortable({ id })
   const commits = useCommitCounter()
 
   return (
@@ -47,10 +47,9 @@ const OurRow = ({ id }: { id: string }) => {
           ...rowStyle,
           ...handleProps.style,
           transform: `translate3d(${translate.x}px, ${translate.y}px, 0)`,
-          // The dragged row must not ease — it follows the pointer, and easing would make it lag
-          // behind your hand. Every other row eases, because it is being displaced rather than
-          // dragged. dnd-kit's `transition` does the same thing on its side of this page.
-          transition: isDragging ? 'none' : 'transform 200ms ease',
+          // The hook's transition: displaced rows ease, the dragged row and the drop commit do
+          // not. dnd-kit's `transition` plays the same role on its side of this page.
+          transition,
           opacity: isDragging ? 0.4 : 1,
         }}
       >

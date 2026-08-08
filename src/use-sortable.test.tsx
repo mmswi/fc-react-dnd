@@ -8,7 +8,7 @@ import type { DragStore } from './internal/store.js'
 import { pointerSensor } from './pointer-sensor.js'
 import { SortableList } from './sortable-list.js'
 import type { Rect } from './types.js'
-import { useSortable } from './use-sortable.js'
+import { SORTABLE_SETTLE_TRANSITION, useSortable } from './use-sortable.js'
 
 const ROW_HEIGHT_PX = 40
 const ACTIVATION_DISTANCE_PX = 4
@@ -41,7 +41,10 @@ const Row = ({
   onCommit?: (id: string) => void
   trackTransform?: boolean
 }) => {
-  const { setNodeRef, handleProps, isDragging, translate } = useSortable({ id, trackTransform })
+  const { setNodeRef, handleProps, isDragging, translate, transition } = useSortable({
+    id,
+    trackTransform,
+  })
 
   useEffect(() => {
     onCommit?.(id)
@@ -56,6 +59,7 @@ const Row = ({
       data-testid={id}
       data-dragging={isDragging}
       data-translate={`${translate.x},${translate.y}`}
+      data-transition={transition ?? 'none'}
       {...handleProps}
     >
       {id}
@@ -110,6 +114,7 @@ const renderList = ({
     getStore: () => store as unknown as DragStore,
     row: (id: string) => view.getByTestId(id),
     translateOf: (id: string) => view.getByTestId(id).dataset.translate,
+    transitionOf: (id: string) => view.getByTestId(id).dataset.transition,
   }
 }
 
@@ -253,6 +258,51 @@ describe('translate', () => {
     })
 
     expect([...commits.slice(mark)].sort()).toEqual(['a', 'c', 'd'])
+  })
+})
+
+describe('transition', () => {
+  it('eases a displaced row and never the dragged one', () => {
+    // The dragged row follows the pointer — easing it would make it lag behind the hand. The
+    // rows being pushed aside are not under the hand, so they glide.
+    const list = renderList()
+
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2 + 7)
+
+    expect(list.transitionOf('a')).toBe('none')
+    expect(list.transitionOf('b')).toBe(SORTABLE_SETTLE_TRANSITION)
+    expect(list.transitionOf('c')).toBe(SORTABLE_SETTLE_TRANSITION)
+  })
+
+  it('keeps easing a row that returns home mid-drag', () => {
+    // Translate going to zero is ambiguous: mid-drag it means "the row glides back to its
+    // slot", at drop it means "the drag is over". Only the drag being active tells them apart.
+    const list = renderList()
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2 + 7)
+
+    act(() => {
+      fireEvent.pointerMove(document, { pointerId: 1, clientX: 0, clientY: 10 })
+    })
+
+    expect(list.translateOf('b')).toBe('0,0')
+    expect(list.transitionOf('b')).toBe(SORTABLE_SETTLE_TRANSITION)
+  })
+
+  it('is off for every row in the commit that ends the drag', () => {
+    // The drop commit changes the DOM order and zeroes the transforms at once. A transition
+    // still active in that commit animates the zeroing: each row paints offset from its new
+    // slot by its old translate and glides in — the dropped row "comes from above into
+    // position" instead of just dropping.
+    const list = renderList()
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2 + 7)
+
+    act(() => {
+      fireEvent.pointerUp(document, { pointerId: 1, clientX: 0, clientY: ROW_HEIGHT_PX * 2 + 7 })
+    })
+
+    expect(list.transitionOf('a')).toBe('none')
+    expect(list.transitionOf('b')).toBe('none')
+    expect(list.transitionOf('c')).toBe('none')
   })
 })
 

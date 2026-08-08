@@ -15,7 +15,7 @@ const initialItems = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
 }))
 
 const Row = ({ id, title }: { id: string; title: string }) => {
-  const { setNodeRef, handleProps, isDragging, isOver, translate } = useSortable({
+  const { setNodeRef, handleProps, isDragging, isOver, translate, transition } = useSortable({
     id,
     data: { title },
   })
@@ -31,9 +31,10 @@ const Row = ({ id, title }: { id: string; title: string }) => {
           ...rowStyle,
           ...handleProps.style,
           transform: `translate3d(${translate.x}px, ${translate.y}px, 0)`,
-          // The dragged row follows the pointer, so it must not ease; the rest are being pushed
-          // out of the way, so they should.
-          transition: isDragging ? 'none' : 'transform 200ms ease',
+          // The hook decides when to ease: displaced rows glide, the dragged row follows the
+          // pointer raw, and the drop commit — which reorders the DOM and zeroes the transform
+          // at once — gets no transition, so the row lands dead in its slot.
+          transition,
           opacity: isDragging ? 0.4 : 1,
           borderColor: isOver ? '#2563eb' : '#e2e8f0',
         }}

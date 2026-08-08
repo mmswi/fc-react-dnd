@@ -22,6 +22,33 @@ import { useDroppable } from './use-droppable.js'
 
 const NO_TRANSLATE: Translate = { x: 0, y: 0 }
 
+/** What a displaced row's transform eases with while a drag is active. */
+export const SORTABLE_SETTLE_TRANSITION = 'transform 200ms ease'
+
+type TranslateSlice = {
+  readonly translate: Translate
+  /**
+   * Whether a drag was active when `translate` last changed.
+   *
+   * Carried in the slice because translate alone cannot answer the one question the transition
+   * needs: a translate going to zero mid-drag is a row gliding home and should ease, while the
+   * same zero at drop is the commit that also reorders the DOM and must not.
+   */
+  readonly isDragActive: boolean
+}
+
+const NO_DRAG_SLICE: TranslateSlice = { translate: NO_TRANSLATE, isDragActive: false }
+
+/**
+ * Compared on `translate` alone, deliberately. `isDragActive` flips for every row on every drag
+ * start and end; comparing it would re-render all N rows at both moments, and the whole point of
+ * the slice model is that untouched rows never render. The flag can therefore go stale on a row
+ * whose translate never changed — harmlessly, because a transition only matters in the commit
+ * where the transform changes, and that commit re-renders the row with a fresh flag.
+ */
+const translateSlicesAreEqual = (a: TranslateSlice, b: TranslateSlice): boolean =>
+  translatesAreEqual(a.translate, b.translate)
+
 export type UseSortableOptions = {
   readonly id: DndId
   readonly data?: DndData
@@ -56,6 +83,17 @@ export type UseSortableResult = {
   readonly isOver: boolean
   /** Where this item sits relative to its resting position. `{ x: 0, y: 0 }` when it has not moved. */
   readonly translate: Translate
+  /**
+   * The `transition` to put next to the transform: `SORTABLE_SETTLE_TRANSITION` for a row being
+   * displaced by an active drag, `undefined` otherwise.
+   *
+   * The `undefined` cases are load-bearing, not an absence. The dragged row follows the pointer,
+   * and easing it makes it lag behind the hand. And the commit that ends a drag reorders the DOM
+   * and zeroes the transforms **at once** — a transition still active there animates the zeroing,
+   * so every moved row paints offset from its new slot by its old translate and glides in. That
+   * is "the dropped row comes in from above" instead of just dropping.
+   */
+  readonly transition: string | undefined
 }
 
 export const useSortable = (options: UseSortableOptions): UseSortableResult => {
@@ -77,40 +115,49 @@ export const useSortable = (options: UseSortableOptions): UseSortableResult => {
     [draggable.setNodeRef, droppable.setNodeRef],
   )
 
-  const translate = useStoreSelector(
+  const slice = useStoreSelector(
     store,
-    (state) => {
+    (state): TranslateSlice => {
+      if (state.origin === null) return NO_DRAG_SLICE
+
       // The dragged row follows the pointer. Its projected landing slot is *not* where it should
       // be drawn — the gap the other rows open up is the preview, and the row itself belongs
       // under the cursor.
-      const isBeingDragged = state.origin?.id === id
+      const isBeingDragged = state.origin.id === id
       if (isBeingDragged) {
-        if (!trackTransform) return NO_TRANSLATE
+        if (!trackTransform) return { translate: NO_TRANSLATE, isDragActive: true }
 
         // Constrained to the list's own axis. The pointer delta has both components, and a
         // vertical list that honoured the horizontal one lets the dragged row wander out of the
         // list sideways — which is what it looks like when a sortable "breaks".
-        return direction === LIST_DIRECTIONS.vertical
-          ? { x: 0, y: state.translate.y }
-          : { x: state.translate.x, y: 0 }
+        const translate =
+          direction === LIST_DIRECTIONS.vertical
+            ? { x: 0, y: state.translate.y }
+            : { x: state.translate.x, y: 0 }
+        return { translate, isDragActive: true }
       }
 
-      return (
-        projectList(state, { itemIds: items, direction })?.translateById.get(id) ?? NO_TRANSLATE
-      )
+      return {
+        translate:
+          projectList(state, { itemIds: items, direction })?.translateById.get(id) ?? NO_TRANSLATE,
+        isDragActive: true,
+      }
     },
     // Compared by value, not by reference. The projection is recomputed once per move — that is
     // the point of memoising it — so the `Translate` objects inside it are new every time even
     // when the numbers are not. Left on `Object.is`, every item in the list re-renders on every
     // pointermove: perf invariant 9 satisfied and perf invariant 4 quietly lost.
-    translatesAreEqual,
+    translateSlicesAreEqual,
   )
+
+  const isDisplacedByActiveDrag = slice.isDragActive && !draggable.isDragging
 
   return {
     setNodeRef,
     handleProps: draggable.handleProps,
     isDragging: draggable.isDragging,
     isOver: droppable.isOver,
-    translate,
+    translate: slice.translate,
+    transition: isDisplacedByActiveDrag ? SORTABLE_SETTLE_TRANSITION : undefined,
   }
 }
