@@ -215,6 +215,16 @@ went as far as that model allows and stopped exactly where it runs out.
 
 That is the sentence [T10.5](tasks/T10.5-blog-post.md) should be built around.
 
+### Re-verified 2026-08-08, before writing T10.5
+
+Same primary source, re-read: the `Instruction` union is unchanged across all five variants,
+`attachInstruction` still receives **one element's data**, and it still computes neither a
+parent id nor an index. One refinement worth carrying into the post: it does clamp — but only
+against the row **above** the gap, via that row's own `currentLevel`. Which is the structural
+argument arriving from the other direction. A hitbox attached to one element knows its own
+level and cannot know the next row's, so a bound that needs both neighbours is not something
+the model declined to compute; it is something the model cannot express.
+
 ### Consequences
 
 - **The scope survives, with sharper framing.** The differentiator is not "we do trees" —
