@@ -146,7 +146,9 @@ careless implementation will happily drop a node inside its own subtree.
 
 ```tsx
 import { DndProvider } from 'fc-react-dnd/dnd-provider'
+import { DragOverlay } from 'fc-react-dnd/drag-overlay'
 import { applyTreeDrop, flattenTree, type TreeItem } from 'fc-react-dnd/tree'
+import { useActiveDrag } from 'fc-react-dnd/use-active-drag'
 import { useDndMonitor } from 'fc-react-dnd/use-dnd-monitor'
 import { useTreeDrop } from 'fc-react-dnd/use-tree-drop'
 import { useMemo, useState } from 'react'
@@ -172,29 +174,78 @@ const Tree = () => {
     },
   })
 
+  const indicator = projection?.indicator
+
   return (
-    <ul role="tree">
-      {rows.map((row) => {
-        const { ref, handleProps, isDragging } = getRowProps(row.id)
-        return (
-          <li
-            key={row.id}
-            role="treeitem"
-            aria-level={row.depth + 1}
-            aria-posinset={row.index + 1}
-            aria-setsize={rows.filter((sibling) => sibling.parentId === row.parentId).length}
-            style={{ paddingLeft: row.depth * INDENT_PX, opacity: isDragging ? 0.4 : 1 }}
-          >
-            <button type="button" ref={ref} {...handleProps}>
-              {String(row.id)}
-            </button>
-          </li>
-        )
-      })}
-    </ul>
+    <>
+      <ul role="tree">
+        {rows.map((row) => {
+          const { ref, handleProps, isDragging, style } = getRowProps(row.id)
+          const anchored = indicator?.rowId === row.id ? indicator : null
+
+          return (
+            <li
+              key={row.id}
+              role="treeitem"
+              aria-level={row.depth + 1}
+              aria-posinset={row.index + 1}
+              aria-setsize={rows.filter((sibling) => sibling.parentId === row.parentId).length}
+              // The line is positioned against this row, so nothing here needs to know a row
+              // height or share a positioned ancestor with the rest of the list.
+              style={{
+                position: 'relative',
+                paddingLeft: row.depth * INDENT_PX,
+                opacity: isDragging ? 0.4 : 1,
+                outline: anchored?.edge === 'over' ? '2px solid #2563eb' : undefined,
+              }}
+            >
+              <button type="button" ref={ref} {...handleProps} style={style}>
+                {String(row.id)}
+              </button>
+
+              {anchored && anchored.edge !== 'over' ? (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    left: anchored.depth * INDENT_PX,
+                    right: 0,
+                    height: 2,
+                    background: '#2563eb',
+                    ...(anchored.edge === 'above' ? { top: -1 } : { bottom: -1 }),
+                  }}
+                />
+              ) : null}
+            </li>
+          )
+        })}
+      </ul>
+
+      {/* Tree rows never move, so this is the only thing that follows the cursor. */}
+      <DragOverlay>
+        <TreeDragPreview />
+      </DragOverlay>
+    </>
   )
 }
+
+const TreeDragPreview = () => {
+  const active = useActiveDrag()
+  return active ? <div className="drag-preview">{String(active.id)}</div> : null
+}
 ```
+
+**Tree rows do not move during a drag, so nothing is visible unless you render it.** That is
+deliberate — rows are measure-only, and translating them would move the very geometry the
+projection is computed from — but it means a tree wired up without the two pieces above feels
+broken rather than minimal. You need both: a **line** (or box) from `projection.indicator`, and
+an **overlay** carrying something under the cursor.
+
+`projection.indicator` gives you `{ rowId, edge, depth }` already resolved into screen terms:
+which visible row to draw against, whether the line goes above it, below it, or as a box over
+it, and at what indent. Do not derive that from `afterId`/`beforeId` — those are sibling-space,
+an `into` target's `beforeId` is its first child, and an un-nest belongs below a whole subtree.
+This library's own demo got it wrong three times before the projection started answering it.
 
 `projection` is `TreeDropProjection | null`. `null` means **no legal position here** — the gap
 between a node and its own first child, when that node will not take children, admits nothing.
