@@ -7,7 +7,11 @@ made relative to *one row* — "you are above this item", "you are in its middle
 to work out what that means for your data. This one returns the answer:
 
 ```ts
-{ parentId: 'handbook', index: 0, depth: 1, mode: 'between', afterId: null, beforeId: 'on-call' }
+{
+  parentId: 'handbook', index: 0, depth: 1,
+  mode: 'between', afterId: null, beforeId: 'on-call',
+  indicator: { rowId: 'handbook', edge: 'below', depth: 1 },  // where to draw it
+}
 ```
 
 A position, clamped against both neighbours, with the dragged subtree removed from the maths so a
@@ -49,7 +53,7 @@ import { useSortable } from 'fc-react-dnd/use-sortable'
 import { useMemo, useState } from 'react'
 
 const Row = ({ id }: { id: string }) => {
-  const { setNodeRef, handleProps, isDragging, translate } = useSortable({ id })
+  const { setNodeRef, handleProps, isDragging, translate, transition } = useSortable({ id })
 
   return (
     <li
@@ -58,6 +62,7 @@ const Row = ({ id }: { id: string }) => {
       style={{
         ...handleProps.style,
         transform: `translate3d(${translate.x}px, ${translate.y}px, 0)`,
+        transition,
         opacity: isDragging ? 0.4 : 1,
       }}
     >
@@ -98,6 +103,13 @@ export const TaskList = () => {
 Pointer and keyboard both work out of the box. `DndProvider` defaults `sensors` to
 `[pointerSensor(), keyboardSensor()]`.
 
+**Pass `transition` through** — it is not decoration. It carries the settle easing for a row
+being displaced, and is `undefined` for the row under your hand (easing would make it lag) and
+for every row in the commit that ends the drag. That last case is why the hook owns the
+decision: the drop commit reorders the DOM and zeroes the transforms *at once*, so a transition
+still live there animates the zeroing and every moved row glides in from its old offset instead
+of landing in place.
+
 ---
 
 ## Trees
@@ -125,13 +137,20 @@ type Doc = { title: string }
 
 const INDENT_PX = 24
 
-const Tree = ({ items }: { items: readonly TreeItem<Doc>[] }) => {
+const INITIAL_TREE: readonly TreeItem<Doc>[] = [
+  { id: 'handbook', title: 'Handbook', children: [{ id: 'onboarding', title: 'Onboarding' }] },
+  { id: 'roadmap', title: 'Roadmap' },
+]
+
+const Tree = () => {
+  const [items, setItems] = useState<readonly TreeItem<Doc>[]>(INITIAL_TREE)
   const { projection, getRowProps } = useTreeDrop({ items, indentPx: INDENT_PX })
   const rows = useMemo(() => flattenTree(items).rows, [items])
 
   useDndMonitor({
     onDragEnd: (event) => {
-      if (projection) applyTreeDrop(items, event.active.id, projection)
+      // `applyTreeDrop` is pure — it returns the new tree and mutates nothing.
+      if (projection) setItems((current) => applyTreeDrop(current, event.active.id, projection))
     },
   })
 
@@ -168,10 +187,18 @@ Hide the indicator; a release there moves nothing.
 - **Drop-into vs drop-between.** A nestable row has three bands: a thin strip at the top and
   bottom for the gaps beside it, and a middle that means "inside this node". A row that refuses
   children has two bands and no middle.
-- **Depth from horizontal position**, in `indentPx` steps, clamped against **both** neighbours:
-  you cannot go shallower than the row below the gap, nor deeper than one level inside the row
-  above — and that deeper bound obeys `canNest` too, because one level inside a row *is* nesting
-  into it.
+- **Depth from horizontal position**, in `indentPx` steps. You cannot go deeper than one level
+  inside the row above, and that bound obeys `canNest`, because one level inside a row *is*
+  nesting into it. Going shallower is where most tree implementations trap you — see below.
+- **Dragging left lifts a row out of its parent**, from anywhere in a group. The clamp everyone
+  quotes — `[next.depth, prev.depth + 1]` — makes un-nesting nearly unreachable, because every
+  row bounding a gap *inside* a group sits at that group's depth or deeper, so the lower bound
+  can never offer a way out. You end up having to shuffle a row to the bottom of its parent
+  before you are allowed to lift it. Here, a deliberate leftward pull drops the floor to the
+  root: one step left makes the row a sibling of its parent, another a sibling of its
+  grandparent. It lands *after* that ancestor's whole subtree, because a row cannot sit at the
+  parent's level between that parent's children — coming out of a group is a downward move. A
+  drag with no horizontal intent still joins the group it was aimed at.
 - **Cycles are unrepresentable.** The dragged node and its whole subtree are removed from the
   rows the maths runs over, so "inside your own child" is never a position the projection can
   produce. There is still a defensive guard in `applyTreeDrop` for a hand-built projection, and
@@ -186,6 +213,12 @@ Hide the indicator; a release there moves nothing.
   alongside `index`, and `applyTreeDrop` resolves the final slot against the tree you hand it. If
   a collaborator removed a sibling above the insertion point mid-drag, the item still lands next
   to the neighbour you meant.
+- **You are told where to draw the indicator.** `projection.indicator` is
+  `{ rowId, edge: 'above' | 'below' | 'over', depth }` — a **screen-space** anchor, already
+  resolved. Deriving one from `afterId`/`beforeId` looks easy and is not: those are
+  *sibling*-space, an `into` target's `beforeId` is its first child, "first child via the gap"
+  has no neighbour ids at all, and an un-nest belongs below a whole subtree. This library's own
+  demo got it wrong three times before the projection started answering it.
 
 ### The maths is usable on its own
 
@@ -209,8 +242,8 @@ against them without rendering anything.
 | `fc-react-dnd/keyboard-sensor` | `keyboardSensor`, `KeyboardSensorOptions` |
 | `fc-react-dnd/collision` | `closestCenter` |
 | `fc-react-dnd/sortable-list` | `SortableList`, `SortableListProps`, `SortEndEvent` |
-| `fc-react-dnd/use-sortable` | `useSortable`, `UseSortableOptions`, `UseSortableResult` |
-| `fc-react-dnd/tree` | `TreeItem`, `TreeRow`, `FlattenedTree`, `FlattenTreeOptions`, `flattenTree`, `TREE_DROP_MODES`, `TreeDropMode`, `TreeNestPredicate`, `TreeDropProjection`, `ProjectTreeDropArgs`, `DEFAULT_TREE_INDENT_PX`, `DEFAULT_NEST_BAND_FRACTION`, `projectTreeDrop`, `applyTreeDrop` |
+| `fc-react-dnd/use-sortable` | `useSortable`, `UseSortableOptions`, `UseSortableResult`, `SORTABLE_SETTLE_TRANSITION` |
+| `fc-react-dnd/tree` | `TreeItem`, `TreeRow`, `FlattenedTree`, `FlattenTreeOptions`, `flattenTree`, `TREE_DROP_MODES`, `TreeDropMode`, `TreeNestPredicate`, `TreeDropProjection`, `TREE_INDICATOR_EDGES`, `TreeIndicatorEdge`, `TreeDropIndicator`, `ProjectTreeDropArgs`, `DEFAULT_TREE_INDENT_PX`, `DEFAULT_NEST_BAND_FRACTION`, `projectTreeDrop`, `applyTreeDrop` |
 | `fc-react-dnd/use-tree-drop` | `useTreeDrop`, `UseTreeDropOptions`, `UseTreeDropResult`, `TreeRowProps` |
 | `fc-react-dnd/types` | `DndId`, `Point`, `Translate`, `Rect`, `DndData`, `DRAG_CANCEL_REASONS`, `DragCancelReason`, `DRAG_DIRECTIONS`, `DragDirection`, `ActiveDragInfo`, `DragActive`, `DragOver`, `DragStartEvent`, `DragMoveEvent`, `DragOverEvent`, `DragEndEvent`, `DragCancelEvent`, `CollisionActive`, `DroppableCandidate`, `CollisionArgs`, `CollisionDetection`, `DirectionalTarget`, `DragSession`, `DragBeginInit`, `SensorContext`, `SensorActivatorProps`, `Sensor`, `DragHandleProps`, `DndAnnouncements`, `DndAccessibility`, `DndMonitorListeners` |
 
