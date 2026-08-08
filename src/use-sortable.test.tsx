@@ -34,12 +34,14 @@ const Row = ({
   id,
   index,
   onCommit,
+  trackTransform,
 }: {
   id: string
   index: number
   onCommit?: (id: string) => void
+  trackTransform?: boolean
 }) => {
-  const { setNodeRef, handleProps, isDragging, translate } = useSortable({ id })
+  const { setNodeRef, handleProps, isDragging, translate } = useSortable({ id, trackTransform })
 
   useEffect(() => {
     onCommit?.(id)
@@ -70,10 +72,12 @@ const renderList = ({
   strict = false,
   onCommit,
   ids = ROW_IDS,
+  trackTransform,
 }: {
   strict?: boolean
   onCommit?: (id: string) => void
   ids?: readonly string[]
+  trackTransform?: boolean
 } = {}) => {
   let store: DragStore | null = null
   const sensors = buildSensors()
@@ -87,7 +91,13 @@ const renderList = ({
       <SortableList items={ids}>
         <ul>
           {ids.map((id, index) => (
-            <Row key={id} id={id} index={index} onCommit={onCommit} />
+            <Row
+              key={id}
+              id={id}
+              index={index}
+              onCommit={onCommit}
+              trackTransform={trackTransform}
+            />
           ))}
         </ul>
       </SortableList>
@@ -157,15 +167,17 @@ describe('translate', () => {
     for (const id of ROW_IDS) expect(list.translateOf(id)).toBe('0,0')
   })
 
-  it('comes from the projection: displaced items close the gap, the rest do not move', () => {
+  it('displaces the rows in the way, and puts the dragged row under the pointer', () => {
     const list = renderList()
 
-    dragBy(list.row('a'), ROW_HEIGHT_PX * 2)
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2 + 7)
 
+    // b and c slide up out of the way…
     expect(list.translateOf('b')).toBe(`0,${-ROW_HEIGHT_PX}`)
     expect(list.translateOf('c')).toBe(`0,${-ROW_HEIGHT_PX}`)
-    expect(list.translateOf('a')).toBe(`0,${ROW_HEIGHT_PX * 2}`)
     expect(list.translateOf('d')).toBe('0,0')
+    // …and the dragged row sits exactly where the pointer is, not snapped to a landing slot.
+    expect(list.translateOf('a')).toBe(`0,${ROW_HEIGHT_PX * 2 + 7}`)
   })
 
   it('goes back to zero after a drop', () => {
@@ -179,14 +191,28 @@ describe('translate', () => {
     for (const id of ROW_IDS) expect(list.translateOf(id)).toBe('0,0')
   })
 
-  it('does not re-render an item whose translate is unchanged by a move', () => {
-    // Committed renders, counted from an effect.
+  it('re-renders only the dragged row for a move that displaces nobody', () => {
+    // The dragged row follows the pointer, so it re-renders on every move — that is what makes a
+    // drag feel like a drag rather than a teleport. Every *other* row still only re-renders when
+    // it actually moves, which is the claim that matters.
     const commits: string[] = []
     const list = renderList({ onCommit: (id) => commits.push(id) })
     dragBy(list.row('a'), ROW_HEIGHT_PX * 2)
     const mark = commits.length
 
-    // Still inside c's bounds: nobody's translate changes.
+    act(() => {
+      fireEvent.pointerMove(document, { pointerId: 1, clientX: 0, clientY: ROW_HEIGHT_PX * 2 + 5 })
+    })
+
+    expect(commits.slice(mark)).toEqual(['a'])
+  })
+
+  it('re-renders nothing at all for such a move when an overlay carries the motion', () => {
+    const commits: string[] = []
+    const list = renderList({ onCommit: (id) => commits.push(id), trackTransform: false })
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2)
+    const mark = commits.length
+
     act(() => {
       fireEvent.pointerMove(document, { pointerId: 1, clientX: 0, clientY: ROW_HEIGHT_PX * 2 + 5 })
     })

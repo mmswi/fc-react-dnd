@@ -26,6 +26,21 @@ export type UseSortableOptions = {
   readonly id: DndId
   readonly data?: DndData
   readonly disabled?: boolean
+  /**
+   * Whether the row being dragged follows the pointer.
+   *
+   * **On by default, and it is what makes a drag feel like a drag.** With it off, the dragged
+   * row is given its *projected landing slot* instead — which is a defensible preview and feels
+   * like teleporting, because the row jumps a whole row-height at a time instead of moving with
+   * your hand.
+   *
+   * It costs one render per pointermove, for one component. The other rows still only re-render
+   * when they actually move, which is the whole point.
+   *
+   * Turn it **off** when a `DragOverlay` carries the motion and the source row stays put or
+   * hidden — then nothing needs to re-render per move at all.
+   */
+  readonly trackTransform?: boolean
 }
 
 export type UseSortableResult = {
@@ -44,12 +59,13 @@ export type UseSortableResult = {
 }
 
 export const useSortable = (options: UseSortableOptions): UseSortableResult => {
-  const { id, data, disabled } = options
+  const { id, data, disabled, trackTransform = true } = options
   const { store } = useDndContext('useSortable')
   const { items, direction } = useSortableListContext('useSortable')
 
-  // The source element does not follow the pointer: its position comes from the projection, so
-  // subscribing to the live translate as well would cost a render per move for nothing.
+  // `useDraggable`'s own transform subscription stays off either way: this hook needs the live
+  // translate for the active row *and* the projection translate for every other row, and one
+  // selector that already knows which is which is cheaper than two that each fire separately.
   const draggable = useDraggable({ id, data, disabled, trackTransform: false })
   const droppable = useDroppable({ id, data, disabled })
 
@@ -63,8 +79,17 @@ export const useSortable = (options: UseSortableOptions): UseSortableResult => {
 
   const translate = useStoreSelector(
     store,
-    (state) =>
-      projectList(state, { itemIds: items, direction })?.translateById.get(id) ?? NO_TRANSLATE,
+    (state) => {
+      // The dragged row follows the pointer. Its projected landing slot is *not* where it should
+      // be drawn — the gap the other rows open up is the preview, and the row itself belongs
+      // under the cursor.
+      const isBeingDragged = state.origin?.id === id
+      if (isBeingDragged) return trackTransform ? state.translate : NO_TRANSLATE
+
+      return (
+        projectList(state, { itemIds: items, direction })?.translateById.get(id) ?? NO_TRANSLATE
+      )
+    },
     // Compared by value, not by reference. The projection is recomputed once per move — that is
     // the point of memoising it — so the `Translate` objects inside it are new every time even
     // when the numbers are not. Left on `Object.is`, every item in the list re-renders on every

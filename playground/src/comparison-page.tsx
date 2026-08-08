@@ -47,6 +47,10 @@ const OurRow = ({ id }: { id: string }) => {
           ...rowStyle,
           ...handleProps.style,
           transform: `translate3d(${translate.x}px, ${translate.y}px, 0)`,
+          // The dragged row must not ease — it follows the pointer, and easing would make it lag
+          // behind your hand. Every other row eases, because it is being displaced rather than
+          // dragged. dnd-kit's `transition` does the same thing on its side of this page.
+          transition: isDragging ? 'none' : 'transform 200ms ease',
           opacity: isDragging ? 0.4 : 1,
         }}
       >
@@ -149,8 +153,13 @@ export const ComparisonPage = () => (
   <section>
     <h2>Comparison</h2>
     <p>
-      The same {ITEM_COUNT}-item list, built twice, with the same commit counter on every row. Drag
-      one row past another in each and compare how many rows report a commit.
+      The same {ITEM_COUNT}-item list, built twice, with the same re-render counter on every row.
+      Drag a row a little way down each list and compare the numbers.
+    </p>
+    <p>
+      Both dragged rows climb steadily, and both should — they follow your pointer. The difference
+      is everything <em>else</em>: on the left only the rows actually being pushed out of the way
+      re-render, and on the right all {ITEM_COUNT} do, on every pointer move.
     </p>
     <p style={panelStyle}>
       Baseline: <code>@dnd-kit/core</code> 6.3.1, <code>@dnd-kit/sortable</code> 10.0.0. Recorded

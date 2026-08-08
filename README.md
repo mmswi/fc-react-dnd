@@ -373,18 +373,30 @@ memoised once per store-state version and read by O(1) selectors.
 
 ### Measured
 
-React `<Profiler>` around **each row**, in Chrome, on the playground's comparison page.
-24 items per list, dragging item 1 onto item 4 — 154 px, 3 boundary crossings, 40 pointermove
-events, the same synthesised pointer path dispatched to both lists in one session. Three runs,
-identical each time.
+React `<Profiler>` around **each row**, in Chrome, on the playground's comparison page. 24 items
+per list, dragging item 1 down onto item 4 — 154 px, 3 boundary crossings, 40 pointermove events,
+the same synthesised pointer path dispatched to both lists in one session. Three runs, identical
+each time.
 
-| During the drag | Rows that committed | Total commits |
-| --- | --- | --- |
-| **fc-react-dnd** | **4** of 24 | **9** |
-| dnd-kit 6.3.1 / sortable 10.0.0 | 24 of 24 | 96 |
+| During the drag | Rows that re-rendered |
+| --- | --- |
+| **fc-react-dnd** | **4** of 24 |
+| dnd-kit 6.3.1 / sortable 10.0.0 | **24** of 24 |
 
-The three rows per boundary crossing are the row being dragged, the row that gained the drop
-target, and the row that lost it. Nothing else has a changed slice, so nothing else renders.
+That is the number the architecture is actually about: when something changes, how much of the
+list finds out. Ours is the row you are dragging plus the rows it displaces. dnd-kit re-renders
+every row in the list on every change.
+
+**The dragged row re-renders on every pointermove in both libraries, and should** — that is what
+makes it follow your hand instead of jumping between slots. Turn `trackTransform: false` on
+`useSortable` and use a `DragOverlay` instead, and nothing in the list re-renders per move at all;
+the overlay moves outside React entirely.
+
+**One caveat on the totals, stated because it cuts against a bigger-sounding claim.** Raw commit
+counts are *not* comparable between the two here: dnd-kit schedules part of its per-move work
+through `requestAnimationFrame`, and the measurement tab was backgrounded, where Chrome throttles
+rAF to zero. Its total is therefore a floor, not a measurement. The "rows that re-rendered"
+column above does not depend on scheduling and is the honest comparison.
 
 `DragOverlay` writes `style.transform` straight to its own node inside `requestAnimationFrame`,
 coalesced to at most one write per frame. Its children render **once** for a whole drag.

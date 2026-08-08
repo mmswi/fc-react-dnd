@@ -28,7 +28,7 @@ export const CommitBadge = ({ count }: { count: number }) => (
       borderRadius: 4,
       padding: '1px 6px',
     }}
-    title="Commits since mount"
+    title="How many times React has re-rendered this row since the page loaded"
   >
     {count}
   </span>

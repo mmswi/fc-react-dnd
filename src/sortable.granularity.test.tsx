@@ -128,7 +128,9 @@ describe(`crossing one boundary in a list of ${ROW_COUNT}`, () => {
     expect(list.commitsSince(mark)).toEqual(['row-0', 'row-5', 'row-6'])
   })
 
-  it('commits nothing for a move that stays inside the current row', () => {
+  it('commits only the dragged row for moves that stay inside the current row', () => {
+    // The dragged row follows the pointer — one component re-rendering per move, which is what a
+    // drag is supposed to look like. The other twenty-three do not move and do not render.
     const list = renderList()
     dragRowZeroOver(list, 5)
     const mark = list.commits.length
@@ -137,7 +139,8 @@ describe(`crossing one boundary in a list of ${ROW_COUNT}`, () => {
       moveTo(ROW_HEIGHT_PX * 5 + offsetPx)
     }
 
-    expect(list.commitsSince(mark)).toEqual([])
+    expect(list.commitsSince(mark)).toEqual(['row-0'])
+    expect(list.commits.length - mark).toBe(15)
   })
 
   it('commits three rows per boundary and no more, across a long drag', () => {

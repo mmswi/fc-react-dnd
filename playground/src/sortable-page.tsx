@@ -15,7 +15,10 @@ const initialItems = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
 }))
 
 const Row = ({ id, title }: { id: string; title: string }) => {
-  const { setNodeRef, handleProps, isDragging, isOver, translate } = useSortable({ id })
+  const { setNodeRef, handleProps, isDragging, isOver, translate } = useSortable({
+    id,
+    data: { title },
+  })
   const commits = useCommitCounter()
 
   return (
@@ -28,7 +31,9 @@ const Row = ({ id, title }: { id: string; title: string }) => {
           ...rowStyle,
           ...handleProps.style,
           transform: `translate3d(${translate.x}px, ${translate.y}px, 0)`,
-          transition: isDragging ? 'none' : 'transform 160ms ease',
+          // The dragged row follows the pointer, so it must not ease; the rest are being pushed
+          // out of the way, so they should.
+          transition: isDragging ? 'none' : 'transform 200ms ease',
           opacity: isDragging ? 0.4 : 1,
           borderColor: isOver ? '#2563eb' : '#e2e8f0',
         }}
@@ -75,9 +80,14 @@ export const SortablePage = () => {
     <section>
       <h2>Sortable list</h2>
       <p>
-        The number on each row is how many times it has <strong>committed</strong> since mount. Drag
-        one row past another and watch which numbers move: the row you are dragging, the row that
-        gained the drop target, and the row that lost it. Nothing else.
+        The number on each row counts <strong>how many times React has re-rendered that row</strong>{' '}
+        since the page loaded. Lower is better — a re-render is work the browser did that you may
+        not have needed.
+      </p>
+      <p>
+        Drag a row and watch. The one you are holding climbs as it follows your pointer; that is
+        what makes it feel like dragging rather than teleporting. The rows it pushes out of the way
+        tick up only when they actually move. Everything else stays at zero.
       </p>
 
       <Profiler id="sortable" onRender={() => {}}>
