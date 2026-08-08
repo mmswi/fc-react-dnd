@@ -297,7 +297,17 @@ of dragging a row.
 
 ### `keyboardSensor(options?)`
 
-`indentPx` (default 24) — how far one ArrowLeft/ArrowRight step moves the item horizontally.
+**Normally you pass nothing.** ArrowLeft/ArrowRight step by one level, and the sensor gets that
+width from `useTreeDrop`'s `indentPx` through the store — so setting the indent in one place is
+enough and the two cannot disagree.
+
+`indentPx` exists as a fallback for one case: driving `projectTreeDrop` by hand without
+`useTreeDrop`, where nothing publishes a step. Where both exist, the published value wins,
+because it belongs to the thing that interprets the number.
+
+```tsx
+useTreeDrop({ items, indentPx: 16 })   // the only place to say it
+```
 
 ---
 

@@ -11,6 +11,7 @@ import {
 } from './internal/tree-projection.js'
 import { useStoreSelector } from './internal/use-store-selector.js'
 import {
+  DEFAULT_TREE_INDENT_PX,
   TREE_DROP_MODES,
   type TreeDropProjection,
   type TreeItem,
@@ -105,6 +106,19 @@ export const useTreeDrop = <Extra>(options: UseTreeDropOptions<Extra>): UseTreeD
     () => ({ items, collapsedIds, indentPx, nestBandFraction, canNest }),
     [items, collapsedIds, indentPx, nestBandFraction, canNest],
   )
+
+  /**
+   * The keyboard sensor cannot know how wide one level is, and this is the only place that
+   * number is authored — so publish it rather than letting the sensor carry a constant that has
+   * to happen to match (`ANALYSIS.md` § A11).
+   *
+   * A registration, so it never notifies and costs no render (perf invariant 5).
+   */
+  const resolvedIndentPx = indentPx ?? DEFAULT_TREE_INDENT_PX
+
+  useEffect(() => {
+    store.setCrossAxisStepPx(resolvedIndentPx)
+  }, [store, resolvedIndentPx])
 
   const projection = useStoreSelector(
     store,

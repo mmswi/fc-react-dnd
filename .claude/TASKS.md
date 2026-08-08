@@ -102,6 +102,10 @@ acceptance criteria hold **and** `bun run verify` is green.
 - [x] [T10.4](tasks/T10.4-final-standards-sweep.md) — final `mihai-coding-standards` sweep over the whole diff
 - [ ] [T10.5](tasks/T10.5-blog-post.md) — **the blog post**, the actual artifact (excluded from the 2026-08-08 implementation pass by the user; everything it depends on is done, and the outstanding inputs are the T9.6 GIF and a first green CI run — see those task files)
 
+## P11 — Defects found after v0.1
+
+- [x] [T11.1](tasks/T11.1-indent-px-single-source.md) — one indent width, not two: `keyboardSensor({ indentPx })` and `useTreeDrop({ indentPx })` are separate constants, so a non-default indent makes one arrow press jump two depth levels (or none)
+
 ## Backlog (explicitly out of v0.1 scope)
 
 No task files — promote an entry to a task (TOC line + file) before coding it.

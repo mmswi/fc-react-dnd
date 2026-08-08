@@ -129,6 +129,16 @@ export type DragStore = {
   cancelActiveDrag: (reason: DragCancelReason) => void
   markRectsDirty: () => void
 
+  /**
+   * How far one horizontal keyboard step should move, in pixels.
+   *
+   * Published by whoever authors that number — `useTreeDrop`, from its `indentPx` — so the
+   * keyboard sensor can ask instead of guessing. Held outside the state object on purpose: it
+   * is configuration, not drag state, and changing it must not notify (perf invariant 5).
+   * See `ANALYSIS.md` § A11.
+   */
+  setCrossAxisStepPx: (px: number) => void
+
   setCollisionDetection: (collisionDetection: CollisionDetection) => void
 }
 
@@ -157,6 +167,12 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
 
   let state = createIdleState()
   let rectsAreDirty = false
+  /**
+   * Zero until something publishes one, and zero is the honest default: with no tree and no
+   * explicit sensor option, nothing in the drag interprets a horizontal offset, so a horizontal
+   * keyboard step has nowhere to land.
+   */
+  let crossAxisStepPx = 0
   /**
    * Ids whose registration has gone, waiting to see whether it comes back.
    *
@@ -344,6 +360,7 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
 
     return {
       isActive: () => isCurrent() && state.origin !== null,
+      crossAxisStepPx: () => crossAxisStepPx,
       move: (translate) => {
         if (isCurrent()) applyUpdate(translate, true)
       },
@@ -536,6 +553,10 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
       if (!state.origin) return
       rectsAreDirty = true
       applyUpdate(state.translate, false)
+    },
+
+    setCrossAxisStepPx: (px) => {
+      crossAxisStepPx = px
     },
 
     setCollisionDetection: (next) => {

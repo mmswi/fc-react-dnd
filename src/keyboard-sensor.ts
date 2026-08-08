@@ -22,8 +22,6 @@ import {
  * the tree projection that decides a horizontal step means a change of depth.
  */
 
-const DEFAULT_INDENT_PX = 24
-
 const DIRECTION_BY_ARROW_KEY: Record<string, DragDirection> = {
   ArrowUp: DRAG_DIRECTIONS.up,
   ArrowDown: DRAG_DIRECTIONS.down,
@@ -32,7 +30,16 @@ const DIRECTION_BY_ARROW_KEY: Record<string, DragDirection> = {
 }
 
 export type KeyboardSensorOptions = {
-  /** How far one ArrowLeft/ArrowRight step moves the item horizontally. */
+  /**
+   * How far one ArrowLeft/ArrowRight step moves the item, in pixels — a **fallback**.
+   *
+   * Normally you do not set this. `useTreeDrop` publishes its `indentPx` to the store and the
+   * sensor reads it from the session, so one keypress is one level whatever the indent is
+   * (`ANALYSIS.md` § A11). This exists because the tree maths is public: someone driving
+   * `projectTreeDrop` by hand, without `useTreeDrop`, has nothing publishing a step and needs
+   * a lever. Where both exist the published value wins, because it belongs to the thing that
+   * interprets the number.
+   */
   readonly indentPx?: number
 }
 
@@ -44,7 +51,8 @@ type KeyboardDrag = {
 }
 
 export const keyboardSensor = (options: KeyboardSensorOptions = {}): Sensor => {
-  const indentPx = options.indentPx ?? DEFAULT_INDENT_PX
+  // No default: an unset fallback means "nobody told me", which is different from 24.
+  const fallbackIndentPx = options.indentPx ?? 0
 
   let drag: KeyboardDrag | null = null
 
@@ -90,7 +98,14 @@ export const keyboardSensor = (options: KeyboardSensorOptions = {}): Sensor => {
   }
 
   const stepDepth = (current: KeyboardDrag, direction: DragDirection): void => {
-    const stepPx = direction === DRAG_DIRECTIONS.right ? indentPx : -indentPx
+    // The tree's own indent, so `round(offsetX / indentPx)` downstream is exactly ±1 by
+    // construction rather than by both sides being configured the same (§ A11).
+    const stepSizePx = current.session.crossAxisStepPx() || fallbackIndentPx
+    // Nothing published a step and none was configured: no part of this drag reads a horizontal
+    // offset, so moving would be motion with no meaning attached.
+    if (stepSizePx === 0) return
+
+    const stepPx = direction === DRAG_DIRECTIONS.right ? stepSizePx : -stepSizePx
     const next: Translate = { x: current.translate.x + stepPx, y: current.translate.y }
 
     current.translate = next

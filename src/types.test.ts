@@ -84,9 +84,11 @@ describe('drag events', () => {
 })
 
 describe('the sensor seam', () => {
-  it('gives a sensor exactly move / end / cancel, plus liveness and directional targeting', () => {
+  it('gives a sensor exactly move / end / cancel, plus liveness and the two questions it cannot answer alone', () => {
+    // `findTargetInDirection` and `crossAxisStepPx` are the same shape: a sensor states an
+    // intent, and the store — which holds the geometry and the tree's indent — resolves it.
     expectTypeOf<keyof DragSession>().toEqualTypeOf<
-      'isActive' | 'move' | 'end' | 'cancel' | 'findTargetInDirection'
+      'isActive' | 'crossAxisStepPx' | 'move' | 'end' | 'cancel' | 'findTargetInDirection'
     >()
   })
 

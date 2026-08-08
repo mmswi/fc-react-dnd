@@ -226,6 +226,51 @@ describe('arrow navigation', () => {
   })
 })
 
+describe('where the horizontal step size comes from (§ A11)', () => {
+  it('takes it from the session, which is where the tree publishes its indent', () => {
+    // The sensor cannot know how wide a level is. Carrying its own constant is how one
+    // keypress came to mean two levels, or none, for any consumer whose indent was not 24.
+    const scene = renderScene([{ id: 'below', rect: rectAt(0, 100) }])
+    scene.getStore().setCrossAxisStepPx(16)
+    pressKey(scene.handle(), ' ')
+
+    pressKey(scene.handle(), 'ArrowRight')
+
+    expect(scene.state().translate).toEqual({ x: 16, y: 0 })
+  })
+
+  it('lets a published step override the sensor option, because the tree does the interpreting', () => {
+    const scene = renderScene([{ id: 'below', rect: rectAt(0, 100) }], { indentPx: 24 })
+    scene.getStore().setCrossAxisStepPx(40)
+    pressKey(scene.handle(), ' ')
+
+    pressKey(scene.handle(), 'ArrowRight')
+
+    expect(scene.state().translate).toEqual({ x: 40, y: 0 })
+  })
+
+  it('falls back to the option when nothing published one', () => {
+    // The escape hatch for a consumer driving `projectTreeDrop` without `useTreeDrop`.
+    const scene = renderScene([{ id: 'below', rect: rectAt(0, 100) }], { indentPx: 32 })
+    pressKey(scene.handle(), ' ')
+
+    pressKey(scene.handle(), 'ArrowRight')
+
+    expect(scene.state().translate).toEqual({ x: 32, y: 0 })
+  })
+
+  it('stays put when nothing published a step and none was configured', () => {
+    // Honest rather than arbitrary: with no tree and no option, nothing in this drag reads a
+    // horizontal offset, so there is no distance that would mean anything.
+    const scene = renderScene([{ id: 'below', rect: rectAt(0, 100) }])
+    pressKey(scene.handle(), ' ')
+
+    pressKey(scene.handle(), 'ArrowRight')
+
+    expect(scene.state().translate).toEqual({ x: 0, y: 0 })
+  })
+})
+
 describe('ArrowLeft and ArrowRight as a depth step', () => {
   it('emits a horizontal transform of one indent, not a target change', () => {
     const scene = renderScene([{ id: 'below', rect: rectAt(0, 100) }], { indentPx: 24 })

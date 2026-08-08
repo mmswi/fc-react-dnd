@@ -49,6 +49,13 @@ type SceneOptions = {
   onProjectionRender?: (projection: TreeDropProjection | null) => void
   extraRowId?: string | null
   strict?: boolean
+  /**
+   * The tree's own indent, left free to disagree with whatever the keyboard sensor does.
+   *
+   * Every keyboard test before § A11 ran both sides at 24 and so asserted the composition at
+   * the single ratio where a mismatch cancels out.
+   */
+  treeIndentPx?: number
 }
 
 const renderTree = ({
@@ -56,12 +63,15 @@ const renderTree = ({
   onProjectionRender,
   extraRowId = null,
   strict = false,
+  treeIndentPx = INDENT_PX,
 }: SceneOptions = {}) => {
   let store: DragStore | null = null
   let latestProjection: TreeDropProjection | null = null
+  // The sensor is given no indent of its own — a keyboard step has to mean one level because
+  // the tree said so, not because both happened to be configured the same.
   const sensors = [
     pointerSensor({ activationDistancePx: ACTIVATION_DISTANCE_PX }),
-    keyboardSensor({ indentPx: INDENT_PX }),
+    keyboardSensor(),
   ]
   const collisionCandidateCounts: number[] = []
   const collisionDetection = (args: CollisionArgs) => {
@@ -75,7 +85,7 @@ const renderTree = ({
   }
 
   const Tree = ({ withExtraRow }: { withExtraRow: boolean }) => {
-    const { projection, getRowProps } = useTreeDrop({ items, indentPx: INDENT_PX })
+    const { projection, getRowProps } = useTreeDrop({ items, indentPx: treeIndentPx })
     latestProjection = projection
     onProjectionRender?.(projection)
 
@@ -275,6 +285,59 @@ describe('render granularity — perf invariant 4', () => {
 
     expect(tree.projection()?.mode).toBe('between')
     expect(renders).toBe(rendersAfterStart + 1)
+  })
+})
+
+describe('one arrow press is one level, whatever the indent is (§ A11)', () => {
+  /**
+   * Picks up `changelog` and parks it in the gap below `usage` — a gap that legally admits
+   * depths 0 through 3, so nothing here is the clamp quietly rescuing a wrong step count.
+   */
+  const pickUpAndStep = (tree: ReturnType<typeof renderTree>, presses: number) => {
+    const changelog = tree.row('changelog')
+    changelog.focus()
+
+    act(() => {
+      fireEvent.keyDown(changelog, { key: ' ' })
+    })
+    act(() => {
+      fireEvent.keyDown(changelog, { key: 'ArrowUp' })
+    })
+
+    const key = presses > 0 ? 'ArrowRight' : 'ArrowLeft'
+    for (let press = 0; press < Math.abs(presses); press += 1) {
+      act(() => {
+        fireEvent.keyDown(changelog, { key })
+      })
+    }
+    return tree.projection()
+  }
+
+  it('steps one level per press when the tree indent is wider than the sensor default', () => {
+    // The other direction: a 24px step divided by 64px rounded to 0, so presses did nothing at
+    // all and the drag looked frozen. Measured from the first press rather than from rest,
+    // because this gap's floor is depth 1 and would absorb the very first step either way.
+    const onePress = pickUpAndStep(renderTree({ treeIndentPx: 64 }), 1)
+    const twoPresses = pickUpAndStep(renderTree({ treeIndentPx: 64 }), 2)
+
+    expect(twoPresses?.depth).toBe((onePress?.depth ?? 0) + 1)
+  })
+
+  it('lands on the same depth for every indent, because a press is a level not a distance', () => {
+    const depthAfterTwo = [8, 16, 24, 64].map(
+      (treeIndentPx) => pickUpAndStep(renderTree({ treeIndentPx }), 2)?.depth,
+    )
+
+    expect(new Set(depthAfterTwo).size).toBe(1)
+  })
+
+  it('does not overshoot at a narrow indent, where a press was worth one and a half levels', () => {
+    // 24 / 16 rounds 1.5 up to 2, so presses landed on 2, 3, 5… The ceiling of this gap is 3,
+    // which hides it at one and two presses — the third press is where it shows.
+    const twoPresses = pickUpAndStep(renderTree({ treeIndentPx: 16 }), 2)
+    const threePresses = pickUpAndStep(renderTree({ treeIndentPx: 16 }), 3)
+
+    expect(threePresses?.depth).toBe((twoPresses?.depth ?? 0) + 1)
   })
 })
 

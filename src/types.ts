@@ -184,6 +184,15 @@ export type DragSession = {
    * sensor that goes on believing a drag is running swallows the user's next pickup.
    */
   readonly isActive: () => boolean
+  /**
+   * How far one horizontal step should move, in pixels — `0` when nothing interprets one.
+   *
+   * A sensor cannot know this. In a tree it is the indent width, and the tree is what publishes
+   * it; the sensor asks rather than carrying a constant of its own that has to happen to match.
+   * Same shape as `findTargetInDirection`: state the intent, let the store resolve it
+   * (`ANALYSIS.md` § A11).
+   */
+  readonly crossAxisStepPx: () => number
   readonly move: (translate: Translate) => void
   readonly end: () => void
   readonly cancel: (reason: DragCancelReason) => void

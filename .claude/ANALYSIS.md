@@ -1269,3 +1269,70 @@ failures by the best-placed consumer settled the question.
 Both halves of this were found by a person dragging a real tree, not by the suite. The 59 tree
 tests all passed throughout, because they assert the projection against *the rule as written*.
 A rule can be implemented perfectly and still be the wrong rule; only trying it tells you.
+
+## A11 — One indent width: who owns it (2026-08-09)
+
+*Opened by [T11.1](tasks/T11.1-indent-px-single-source.md). The defect is verified, not
+theorised — see that task file for the reproduction table.*
+
+`indentPx` is one physical quantity stored twice. The keyboard sensor emits a **pixel** step of
+`±its own indentPx`; the tree projection recovers a step count as `round(offsetX / its own
+indentPx)`. Both default to 24, so the composition is the identity and the seam is invisible.
+Change either and one keypress silently means two levels, or none.
+
+> **Decision: the tree publishes its indent to the store, and the keyboard sensor asks the
+> session for it. The sensor's own constant is deleted.**
+
+### Why not the alternatives
+
+**Sensor emits units instead of pixels.** `translate` would then mean pixels for a pointer drag
+and levels for a keyboard drag — the same field carrying two units, told apart only by which
+sensor is active. Everything downstream that reads `translate.x` (the overlay, a horizontal
+sortable list) would have to make the same distinction, and each one is a place to get it
+wrong. It also leaks tree vocabulary into a sensor whose whole design is that it knows nothing
+about trees (§ A9.1).
+
+**One shared constant, two options.** Deletes the duplicated literal and leaves the defect:
+`useTreeDrop({ indentPx: 16 })` alone still breaks the keyboard. It fails T11.1's first
+acceptance criterion outright — the two must be configurable *independently* and still agree.
+
+**DEV-mode warning on disagreement.** Deliberately **not** taken, though it composes with the
+decision. This library has no `NODE_ENV` branch anywhere, and introducing the first one is its
+own decision about build shape and about what the production bundle contains. A warning also
+concedes the mismatch is expressible; the point of the chosen fix is that it is not.
+
+### The shape
+
+The store gains a cross-axis step size — the pixel distance one horizontal keyboard step should
+cover — published by whoever knows it and read through the session:
+
+```
+useTreeDrop({ indentPx })            (the only place the number is authored)
+↓  store.setCrossAxisStepPx(px)      (a registration: no notify, no render)
+↓
+keyboardSensor  ArrowLeft/ArrowRight
+↓  session.crossAxisStepPx()
+↓  session.move({ x: ±px, … })       (still a real pixel distance)
+↓
+projectTreeDrop  round(offsetX / indentPx) === ±1   by construction
+```
+
+`translate.x` stays what it always was, a pixel distance, so the overlay and every other reader
+are untouched. The projection's arithmetic is unchanged. Only the source of the sensor's step
+moves.
+
+**This is the same shape as `findTargetInDirection`** (§ A9.1): the sensor states an intent it
+cannot resolve alone, and the store — which holds the geometry — answers. Vertical steps already
+worked this way. Horizontal ones were the outlier, guessing a number they had no business
+knowing.
+
+### What it costs
+
+- **`keyboardSensor`'s `indentPx` becomes a fallback**, used only when nothing has published a
+  step, and it no longer has a default constant. It stays because the tree maths is public:
+  someone wiring `projectTreeDrop` by hand without `useTreeDrop` needs a lever. The tree wins
+  when both exist, because the tree is what interprets the number.
+- **Zero published steps means horizontal arrows do nothing**, which is honest: with no tree
+  and no explicit option, nothing in the drag interprets a horizontal offset.
+- **Two trees under one provider with different indents**: last mount wins. Cross-tree drags
+  are already Backlog (§ A7 F10), and one drag belongs to one tree.
