@@ -180,6 +180,26 @@ describe('translate', () => {
     expect(list.translateOf('a')).toBe(`0,${ROW_HEIGHT_PX * 2 + 7}`)
   })
 
+  it('never lets the dragged row wander off the list axis', () => {
+    // The pointer delta has both components. A vertical list that honoured the horizontal one
+    // lets the dragged row slide out of the list sideways — which is what it looks like when a
+    // sortable "breaks".
+    const list = renderList()
+
+    fireEvent.pointerDown(list.row('a'), {
+      pointerId: 1,
+      clientX: 0,
+      clientY: 0,
+      button: 0,
+      isPrimary: true,
+    })
+    act(() => {
+      fireEvent.pointerMove(document, { pointerId: 1, clientX: 400, clientY: ROW_HEIGHT_PX })
+    })
+
+    expect(list.translateOf('a')).toBe(`0,${ROW_HEIGHT_PX}`)
+  })
+
   it('goes back to zero after a drop', () => {
     const list = renderList()
     dragBy(list.row('a'), ROW_HEIGHT_PX * 2)

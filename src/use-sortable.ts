@@ -3,7 +3,7 @@
 import { type RefCallback, useCallback } from 'react'
 import { useDndContext } from './internal/context.js'
 import { translatesAreEqual } from './internal/geometry.js'
-import { projectList } from './internal/list-projection.js'
+import { LIST_DIRECTIONS, projectList } from './internal/list-projection.js'
 import { useSortableListContext } from './internal/sortable-context.js'
 import { useStoreSelector } from './internal/use-store-selector.js'
 import type { DndData, DndId, DragHandleProps, Translate } from './types.js'
@@ -84,7 +84,16 @@ export const useSortable = (options: UseSortableOptions): UseSortableResult => {
       // be drawn — the gap the other rows open up is the preview, and the row itself belongs
       // under the cursor.
       const isBeingDragged = state.origin?.id === id
-      if (isBeingDragged) return trackTransform ? state.translate : NO_TRANSLATE
+      if (isBeingDragged) {
+        if (!trackTransform) return NO_TRANSLATE
+
+        // Constrained to the list's own axis. The pointer delta has both components, and a
+        // vertical list that honoured the horizontal one lets the dragged row wander out of the
+        // list sideways — which is what it looks like when a sortable "breaks".
+        return direction === LIST_DIRECTIONS.vertical
+          ? { x: 0, y: state.translate.y }
+          : { x: state.translate.x, y: 0 }
+      }
 
       return (
         projectList(state, { itemIds: items, direction })?.translateById.get(id) ?? NO_TRANSLATE
