@@ -3,6 +3,7 @@
 import { type RefCallback, useEffect, useMemo, useRef } from 'react'
 import { useDndContext } from './internal/context.js'
 import { buildDragHandleProps } from './internal/handle-props.js'
+import { buildNodeStyle } from './internal/node-style.js'
 import {
   projectTreeForDrag,
   type TreeProjectionArgs,
@@ -15,7 +16,7 @@ import {
   type TreeItem,
   type TreeNestPredicate,
 } from './tree.js'
-import type { DndId, DragHandleProps } from './types.js'
+import type { DndId, DragHandleProps, DragNodeStyle } from './types.js'
 
 /**
  * Wires the pure tree maths to a live drag.
@@ -32,10 +33,20 @@ import type { DndId, DragHandleProps } from './types.js'
  * list's model. The projection drives one indicator. Live reflow is a Backlog item.
  */
 
+/** Tree rows never translate, so one frozen object serves every row of every tree. */
+const TREE_ROW_STYLE: DragNodeStyle = buildNodeStyle(null, undefined)
+
 export type TreeRowProps = {
   readonly ref: RefCallback<HTMLElement>
   readonly handleProps: DragHandleProps
   readonly isDragging: boolean
+  /**
+   * Pass it straight to `style`. No `transform` here and there never will be while tree mode is
+   * indicator-only — but `touch-action` still has to reach the element, and a consumer who
+   * spreads `{...handleProps}` and then sets `style` would drop it. Same object shape as the
+   * other hooks so no row type is the odd one out.
+   */
+  readonly style: DragNodeStyle
 }
 
 export type UseTreeDropOptions<Extra> = {
@@ -162,7 +173,12 @@ export const useTreeDrop = <Extra>(options: UseTreeDropOptions<Extra>): UseTreeD
       rowCache.byId.set(id, cached)
     }
 
-    return { ref: cached.ref, handleProps: cached.handleProps, isDragging: activeId === id }
+    return {
+      ref: cached.ref,
+      handleProps: cached.handleProps,
+      isDragging: activeId === id,
+      style: TREE_ROW_STYLE,
+    }
   }
 
   const registeredIds = useRef(new Set<DndId>())

@@ -35,15 +35,18 @@ const Row = ({
   index,
   onCommit,
   trackTransform,
+  transition: transitionOption,
 }: {
   id: string
   index: number
   onCommit?: (id: string) => void
   trackTransform?: boolean
+  transition?: string | null
 }) => {
-  const { setNodeRef, handleProps, isDragging, translate, transition } = useSortable({
+  const { setNodeRef, handleProps, isDragging, translate, transition, style } = useSortable({
     id,
     trackTransform,
+    ...(transitionOption !== undefined && { transition: transitionOption }),
   })
 
   useEffect(() => {
@@ -60,6 +63,7 @@ const Row = ({
       data-dragging={isDragging}
       data-translate={`${translate.x},${translate.y}`}
       data-transition={transition ?? 'none'}
+      data-style={JSON.stringify(style)}
       {...handleProps}
     >
       {id}
@@ -77,11 +81,13 @@ const renderList = ({
   onCommit,
   ids = ROW_IDS,
   trackTransform,
+  transition,
 }: {
   strict?: boolean
   onCommit?: (id: string) => void
   ids?: readonly string[]
   trackTransform?: boolean
+  transition?: string | null
 } = {}) => {
   let store: DragStore | null = null
   const sensors = buildSensors()
@@ -101,6 +107,7 @@ const renderList = ({
               index={index}
               onCommit={onCommit}
               trackTransform={trackTransform}
+              transition={transition}
             />
           ))}
         </ul>
@@ -115,6 +122,7 @@ const renderList = ({
     row: (id: string) => view.getByTestId(id),
     translateOf: (id: string) => view.getByTestId(id).dataset.translate,
     transitionOf: (id: string) => view.getByTestId(id).dataset.transition,
+    styleOf: (id: string) => JSON.parse(view.getByTestId(id).dataset.style ?? '{}'),
   }
 }
 
@@ -303,6 +311,81 @@ describe('transition', () => {
     expect(list.transitionOf('a')).toBe('none')
     expect(list.transitionOf('b')).toBe('none')
     expect(list.transitionOf('c')).toBe('none')
+  })
+})
+
+describe('style — the whole thing, ready to spread', () => {
+  it('carries touch-action even before a drag, so a spread cannot lose it', () => {
+    // The failure this prevents: `{...handleProps} style={mine}` silently drops
+    // `handleProps.style`, and touch dragging stops working on a device the author is not
+    // testing on. Carrying it here means the one object a consumer passes is complete.
+    const list = renderList()
+
+    expect(list.styleOf('a')).toEqual({ touchAction: 'none' })
+  })
+
+  it('writes a transform for a row the drag displaces, and eases it', () => {
+    const list = renderList()
+
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2 + 7)
+
+    expect(list.styleOf('b')).toEqual({
+      touchAction: 'none',
+      transform: `translate3d(0px, ${-ROW_HEIGHT_PX}px, 0)`,
+      transition: SORTABLE_SETTLE_TRANSITION,
+    })
+  })
+
+  it('gives the dragged row the pointer offset and no easing', () => {
+    const list = renderList()
+
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2 + 7)
+
+    expect(list.styleOf('a')).toEqual({
+      touchAction: 'none',
+      transform: `translate3d(0px, ${ROW_HEIGHT_PX * 2 + 7}px, 0)`,
+    })
+  })
+
+  it('omits the transform entirely for a row that has not moved', () => {
+    // Not `translate3d(0px, 0px, 0)`. An identity transform still promotes the element to its
+    // own compositing layer, so emitting one for all N rows of a list costs N layers to say
+    // "nothing happened here".
+    const list = renderList()
+
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2 + 7)
+
+    expect(list.styleOf('d')).toEqual({ touchAction: 'none' })
+  })
+
+  it('drops the easing in the commit that ends the drag', () => {
+    const list = renderList()
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2 + 7)
+
+    act(() => {
+      fireEvent.pointerUp(document, { pointerId: 1, clientX: 0, clientY: ROW_HEIGHT_PX * 2 + 7 })
+    })
+
+    expect(list.styleOf('b')).toEqual({ touchAction: 'none' })
+  })
+
+  it('uses a consumer-supplied transition', () => {
+    const list = renderList({ transition: 'transform 500ms linear' })
+
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2 + 7)
+
+    expect(list.styleOf('b').transition).toBe('transform 500ms linear')
+  })
+
+  it('leaves the easing off entirely when the transition is null', () => {
+    const list = renderList({ transition: null })
+
+    dragBy(list.row('a'), ROW_HEIGHT_PX * 2 + 7)
+
+    expect(list.styleOf('b')).toEqual({
+      touchAction: 'none',
+      transform: `translate3d(0px, ${-ROW_HEIGHT_PX}px, 0)`,
+    })
   })
 })
 

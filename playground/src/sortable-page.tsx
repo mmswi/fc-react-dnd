@@ -15,7 +15,7 @@ const initialItems = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
 }))
 
 const Row = ({ id, title }: { id: string; title: string }) => {
-  const { setNodeRef, handleProps, isDragging, isOver, translate, transition } = useSortable({
+  const { setNodeRef, handleProps, isDragging, isOver, style } = useSortable({
     id,
     data: { title },
   })
@@ -27,14 +27,11 @@ const Row = ({ id, title }: { id: string; title: string }) => {
         type="button"
         ref={setNodeRef}
         {...handleProps}
+        // `style` already carries transform, the settle easing, and touch-action. Everything
+        // after it is this demo's own taste.
         style={{
           ...rowStyle,
-          ...handleProps.style,
-          transform: `translate3d(${translate.x}px, ${translate.y}px, 0)`,
-          // The hook decides when to ease: displaced rows glide, the dragged row follows the
-          // pointer raw, and the drop commit — which reorders the DOM and zeroes the transform
-          // at once — gets no transition, so the row lands dead in its slot.
-          transition,
+          ...style,
           opacity: isDragging ? 0.4 : 1,
           borderColor: isOver ? '#2563eb' : '#e2e8f0',
         }}

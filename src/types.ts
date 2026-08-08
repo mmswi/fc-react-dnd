@@ -223,6 +223,28 @@ export type Sensor = {
   readonly activate: (context: SensorContext) => SensorActivatorProps
 }
 
+/**
+ * The style for the element that **moves** — complete, and meant to be passed as-is.
+ *
+ * Assembling this by hand is three chances to get a drag wrong, and every one of them has been
+ * taken in this repo's own demo. Forget `transform` and nothing moves. Forget `transition` and
+ * a dropped row glides in from wherever it was instead of landing. Forget to merge
+ * `handleProps.style` and `touch-action` is lost, which breaks dragging on touch devices and
+ * nowhere else — so it survives every desktop test the author runs.
+ *
+ * `touchAction` rides along for that last reason: the node and the handle are usually the same
+ * element, and `style={...}` after `{...handleProps}` overwrites the handle's own style object.
+ * Carrying it here makes the common spread correct instead of subtly broken.
+ *
+ * Both motion properties are optional and absent at rest. An identity `translate3d(0,0,0)`
+ * would promote every row to its own compositing layer just to say nothing happened.
+ */
+export type DragNodeStyle = {
+  readonly touchAction: 'none'
+  readonly transform?: string
+  readonly transition?: string
+}
+
 /** Everything `useDraggable` asks a consumer to spread onto the element that starts a drag. */
 export type DragHandleProps = SensorActivatorProps & {
   readonly role: 'button'

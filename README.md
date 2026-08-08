@@ -53,19 +53,10 @@ import { useSortable } from 'fc-react-dnd/use-sortable'
 import { useMemo, useState } from 'react'
 
 const Row = ({ id }: { id: string }) => {
-  const { setNodeRef, handleProps, isDragging, translate, transition } = useSortable({ id })
+  const { setNodeRef, handleProps, isDragging, style } = useSortable({ id })
 
   return (
-    <li
-      ref={setNodeRef}
-      {...handleProps}
-      style={{
-        ...handleProps.style,
-        transform: `translate3d(${translate.x}px, ${translate.y}px, 0)`,
-        transition,
-        opacity: isDragging ? 0.4 : 1,
-      }}
-    >
+    <li ref={setNodeRef} {...handleProps} style={{ ...style, opacity: isDragging ? 0.4 : 1 }}>
       {id}
     </li>
   )
@@ -103,12 +94,39 @@ export const TaskList = () => {
 Pointer and keyboard both work out of the box. `DndProvider` defaults `sensors` to
 `[pointerSensor(), keyboardSensor()]`.
 
-**Pass `transition` through** — it is not decoration. It carries the settle easing for a row
-being displaced, and is `undefined` for the row under your hand (easing would make it lag) and
-for every row in the commit that ends the drag. That last case is why the hook owns the
-decision: the drop commit reorders the DOM and zeroes the transforms *at once*, so a transition
-still live there animates the zeroing and every moved row glides in from its old offset instead
-of landing in place.
+### `style` is the whole thing, and you should pass it
+
+`style` carries `transform`, the settle `transition`, and `touch-action`. Hand-assembling those
+is three ways to get a drag wrong, and I made all three in this repo's own demo before moving
+the decision into the hook:
+
+- **No `transform`** and nothing moves.
+- **No `transition`**, or the wrong one, and a dropped row glides in from wherever it was
+  instead of landing. The hook applies it only to rows being *displaced* — never to the row
+  under your hand, and never in the commit that ends the drag. That last case is the subtle
+  one: the drop commit reorders the DOM and zeroes the transforms *at once*, so a transition
+  still live there animates the zeroing.
+- **Forgetting to merge `handleProps.style`** loses `touch-action: none`, which breaks dragging
+  on touch devices and nowhere else — so it survives every desktop test you run. Carrying it in
+  `style` makes `{...handleProps} style={style}` correct instead of subtly broken.
+
+Everything after the spread is yours:
+
+```tsx
+style={{ ...style, opacity: isDragging ? 0.4 : 1, background: isOver ? '#eef' : '#fff' }}
+```
+
+Opacity is deliberately **not** in there. Ghosting the source row is a design choice, and an
+overlay-driven list wants the opposite.
+
+To change the easing, pass it — or `null` to turn it off:
+
+```tsx
+useSortable({ id, transition: 'transform 300ms cubic-bezier(.2,0,0,1)' })
+useSortable({ id, transition: null })
+```
+
+`translate` and `transition` stay exposed for driving your own animation.
 
 ---
 
@@ -245,7 +263,7 @@ against them without rendering anything.
 | `fc-react-dnd/use-sortable` | `useSortable`, `UseSortableOptions`, `UseSortableResult`, `SORTABLE_SETTLE_TRANSITION` |
 | `fc-react-dnd/tree` | `TreeItem`, `TreeRow`, `FlattenedTree`, `FlattenTreeOptions`, `flattenTree`, `TREE_DROP_MODES`, `TreeDropMode`, `TreeNestPredicate`, `TreeDropProjection`, `TREE_INDICATOR_EDGES`, `TreeIndicatorEdge`, `TreeDropIndicator`, `ProjectTreeDropArgs`, `DEFAULT_TREE_INDENT_PX`, `DEFAULT_NEST_BAND_FRACTION`, `projectTreeDrop`, `applyTreeDrop` |
 | `fc-react-dnd/use-tree-drop` | `useTreeDrop`, `UseTreeDropOptions`, `UseTreeDropResult`, `TreeRowProps` |
-| `fc-react-dnd/types` | `DndId`, `Point`, `Translate`, `Rect`, `DndData`, `DRAG_CANCEL_REASONS`, `DragCancelReason`, `DRAG_DIRECTIONS`, `DragDirection`, `ActiveDragInfo`, `DragActive`, `DragOver`, `DragStartEvent`, `DragMoveEvent`, `DragOverEvent`, `DragEndEvent`, `DragCancelEvent`, `CollisionActive`, `DroppableCandidate`, `CollisionArgs`, `CollisionDetection`, `DirectionalTarget`, `DragSession`, `DragBeginInit`, `SensorContext`, `SensorActivatorProps`, `Sensor`, `DragHandleProps`, `DndAnnouncements`, `DndAccessibility`, `DndMonitorListeners` |
+| `fc-react-dnd/types` | `DndId`, `Point`, `Translate`, `Rect`, `DndData`, `DragNodeStyle`, `DRAG_CANCEL_REASONS`, `DragCancelReason`, `DRAG_DIRECTIONS`, `DragDirection`, `ActiveDragInfo`, `DragActive`, `DragOver`, `DragStartEvent`, `DragMoveEvent`, `DragOverEvent`, `DragEndEvent`, `DragCancelEvent`, `CollisionActive`, `DroppableCandidate`, `CollisionArgs`, `CollisionDetection`, `DirectionalTarget`, `DragSession`, `DragBeginInit`, `SensorContext`, `SensorActivatorProps`, `Sensor`, `DragHandleProps`, `DndAnnouncements`, `DndAccessibility`, `DndMonitorListeners` |
 
 ### `DndProvider`
 

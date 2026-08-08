@@ -4,9 +4,10 @@ import { type RefCallback, useCallback } from 'react'
 import { useDndContext } from './internal/context.js'
 import { translatesAreEqual } from './internal/geometry.js'
 import { LIST_DIRECTIONS, projectList } from './internal/list-projection.js'
+import { buildNodeStyle } from './internal/node-style.js'
 import { useSortableListContext } from './internal/sortable-context.js'
 import { useStoreSelector } from './internal/use-store-selector.js'
-import type { DndData, DndId, DragHandleProps, Translate } from './types.js'
+import type { DndData, DndId, DragHandleProps, DragNodeStyle, Translate } from './types.js'
 import { useDraggable } from './use-draggable.js'
 import { useDroppable } from './use-droppable.js'
 
@@ -54,6 +55,13 @@ export type UseSortableOptions = {
   readonly data?: DndData
   readonly disabled?: boolean
   /**
+   * The easing a **displaced** row settles with, as a CSS `transition` value.
+   *
+   * `null` turns it off. It is never applied to the row under the pointer, or in the commit
+   * that ends a drag — see `UseSortableResult.transition` for why that second one matters.
+   */
+  readonly transition?: string | null
+  /**
    * Whether the row being dragged follows the pointer.
    *
    * **On by default, and it is what makes a drag feel like a drag.** With it off, the dragged
@@ -94,10 +102,23 @@ export type UseSortableResult = {
    * is "the dropped row comes in from above" instead of just dropping.
    */
   readonly transition: string | undefined
+  /**
+   * `transform`, `transition` and `touch-action` in one object — pass it straight to `style`.
+   *
+   * `translate` and `transition` stay exposed for consumers driving their own animation; this
+   * is the path that is correct by default.
+   */
+  readonly style: DragNodeStyle
 }
 
 export const useSortable = (options: UseSortableOptions): UseSortableResult => {
-  const { id, data, disabled, trackTransform = true } = options
+  const {
+    id,
+    data,
+    disabled,
+    trackTransform = true,
+    transition: settleTransition = SORTABLE_SETTLE_TRANSITION,
+  } = options
   const { store } = useDndContext('useSortable')
   const { items, direction } = useSortableListContext('useSortable')
 
@@ -151,6 +172,8 @@ export const useSortable = (options: UseSortableOptions): UseSortableResult => {
   )
 
   const isDisplacedByActiveDrag = slice.isDragActive && !draggable.isDragging
+  const transition =
+    isDisplacedByActiveDrag && settleTransition !== null ? settleTransition : undefined
 
   return {
     setNodeRef,
@@ -158,6 +181,7 @@ export const useSortable = (options: UseSortableOptions): UseSortableResult => {
     isDragging: draggable.isDragging,
     isOver: droppable.isOver,
     translate: slice.translate,
-    transition: isDisplacedByActiveDrag ? SORTABLE_SETTLE_TRANSITION : undefined,
+    transition,
+    style: buildNodeStyle(slice.translate, transition),
   }
 }

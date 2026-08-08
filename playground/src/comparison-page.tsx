@@ -34,7 +34,7 @@ const ITEM_COUNT = 24
 const INITIAL_IDS = Array.from({ length: ITEM_COUNT }, (_unused, index) => `item-${index + 1}`)
 
 const OurRow = ({ id }: { id: string }) => {
-  const { setNodeRef, handleProps, isDragging, translate, transition } = useSortable({ id })
+  const { setNodeRef, handleProps, isDragging, style } = useSortable({ id })
   const commits = useCommitCounter()
 
   return (
@@ -43,15 +43,9 @@ const OurRow = ({ id }: { id: string }) => {
         type="button"
         ref={setNodeRef}
         {...handleProps}
-        style={{
-          ...rowStyle,
-          ...handleProps.style,
-          transform: `translate3d(${translate.x}px, ${translate.y}px, 0)`,
-          // The hook's transition: displaced rows ease, the dragged row and the drop commit do
-          // not. dnd-kit's `transition` plays the same role on its side of this page.
-          transition,
-          opacity: isDragging ? 0.4 : 1,
-        }}
+        // One object against dnd-kit's `CSS.Transform.toString(transform)` plus `transition`
+        // assembled by hand on the other side of this page.
+        style={{ ...rowStyle, ...style, opacity: isDragging ? 0.4 : 1 }}
       >
         {id}
         <CommitBadge count={commits} />

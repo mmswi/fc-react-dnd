@@ -3,8 +3,16 @@
 import { type RefCallback, useCallback, useEffect, useRef } from 'react'
 import { useDndContext } from './internal/context.js'
 import { buildDragHandleProps } from './internal/handle-props.js'
+import { buildNodeStyle } from './internal/node-style.js'
 import { useStoreSelector } from './internal/use-store-selector.js'
-import type { DndData, DndId, DragHandleProps, SensorActivatorProps, Translate } from './types.js'
+import type {
+  DndData,
+  DndId,
+  DragHandleProps,
+  DragNodeStyle,
+  SensorActivatorProps,
+  Translate,
+} from './types.js'
 
 /**
  * Turn any element into a drag source.
@@ -53,6 +61,13 @@ export type UseDraggableResult = {
   readonly isDragging: boolean
   /** `null` unless this item is the one being dragged and `trackTransform` is on. */
   readonly transform: Translate | null
+  /**
+   * `transform` and `touch-action` in one object — pass it straight to `style`.
+   *
+   * No `transition`: easing here would fight the pointer, and a plain draggable has no
+   * displaced neighbours to settle. `useSortable` is where a settle transition belongs.
+   */
+  readonly style: DragNodeStyle
 }
 
 export const useDraggable = (options: UseDraggableOptions): UseDraggableResult => {
@@ -105,5 +120,6 @@ export const useDraggable = (options: UseDraggableOptions): UseDraggableResult =
     }),
     isDragging,
     transform,
+    style: buildNodeStyle(transform, undefined),
   }
 }

@@ -76,6 +76,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 - [x] [T7.3](tasks/T7.3-use-sortable.md) — `src/use-sortable.ts`
 - [x] [T7.4](tasks/T7.4-sortable-granularity-tests.md) — render-granularity + StrictMode tests
 - [x] [T7.5](tasks/T7.5-settle-transition.md) — `useSortable` returns `transition`; the drop commit never eases
+- [x] [T7.6](tasks/T7.6-node-style.md) — every hook returns a ready-to-spread `style` (transform + transition + touch-action)
 
 ## P8 — Tree drag-and-drop (the flagship)
 

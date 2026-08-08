@@ -229,7 +229,7 @@ const TreeBoard = () => {
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {rows.map((row) => {
             const id = String(row.id)
-            const { ref, handleProps, isDragging } = getRowProps(id)
+            const { ref, handleProps, isDragging, style } = getRowProps(id)
             const hasChildren = idsWithChildren.has(id)
 
             return (
@@ -254,7 +254,7 @@ const TreeBoard = () => {
                     ref={ref}
                     {...handleProps}
                     style={{
-                      ...handleProps.style,
+                      ...style,
                       flex: 1,
                       textAlign: 'left',
                       font: 'inherit',
