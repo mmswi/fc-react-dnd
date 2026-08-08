@@ -264,7 +264,8 @@ export const projectTreeDrop = (args: ProjectTreeDropArgs): TreeDropProjection |
   }
   if (positioned.length === 0) return ROOT_PROJECTION
 
-  const requestedDepth = activeRow.depth + Math.round(offsetX / indentPx)
+  const depthSteps = Math.round(offsetX / indentPx)
+  const requestedDepth = activeRow.depth + depthSteps
   const { intoRow, gap } = resolveTarget(positioned, pointerY, activeRow, canNest, nestBandFraction)
 
   if (intoRow) {
@@ -296,7 +297,20 @@ export const projectTreeDrop = (args: ProjectTreeDropArgs): TreeDropProjection |
     }
   }
 
-  const lowestDepth = next ? next.depth : 0
+  // Dragging left is how a user says "take this out of here", and the row below can never grant
+  // it: every row bounding a gap *inside* a group sits at the group's depth or deeper, so a floor
+  // of `next.depth` leaves un-nesting reachable only from the last row of a group — you have to
+  // shuffle the row to the bottom of its parent before you are allowed to lift it out.
+  //
+  // A deliberate leftward pull lowers the floor to the root. Landing there means sliding past the
+  // rest of the group, because a row cannot sit at the parent's level *between* that parent's
+  // children — coming out of a group is a downward move, and this is what it looks like.
+  //
+  // The floor only drops for a leftward pull, never by default: a row arriving from the root
+  // requests depth 0, and granting that unconditionally would turn every drop *into* a group into
+  // a drop past it.
+  const isPullingLeft = depthSteps < 0
+  const lowestDepth = isPullingLeft ? 0 : (next?.depth ?? 0)
   // `prev.depth + 1` *is* nesting into prev, so it obeys the same predicate the middle band does.
   const highestDepth = canNest(prev, activeRow) ? prev.depth + 1 : prev.depth
   // An empty interval means the gap admits no legal position at all — between a node and its own

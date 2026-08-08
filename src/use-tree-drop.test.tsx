@@ -306,10 +306,12 @@ describe('the keyboard path', () => {
       })
     }
 
-    // The gap above 'api' admits depths 1 (api's own level) through 3 (nested inside usage).
+    // The gap above 'api' nests as deep as 3 (inside usage). Going the other way, ArrowLeft
+    // lifts the row out of each enclosing group in turn and stops at the root — the keyboard
+    // half of § A10, and the reason this test is named after the pointer sharing its maths.
     expect(atGap).not.toBeNull()
     expect(deepest?.depth).toBe(3)
-    expect(tree.projection()?.depth).toBe(1)
+    expect(tree.projection()?.depth).toBe(0)
   })
 
   it('reaches every outcome the pointer can reach — §A7 F9', () => {

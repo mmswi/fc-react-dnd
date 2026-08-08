@@ -307,9 +307,11 @@ describe('projectTreeDrop — depth from the horizontal offset', () => {
 })
 
 describe('projectTreeDrop — the depth clamp is canNest-aware (§ A7 F1)', () => {
-  it('cannot go shallower than the row below the gap', () => {
-    // Gap between guide(1) and install(2): install is at depth 2, so nothing shallower is legal.
-    expect(project({ pointerY: topOfRow(2) + 1, depthSteps: -5 })?.depth).toBe(2)
+  it('settles at the depth of the row below the gap when the pointer has not gone left', () => {
+    // Gap between guide(1) and install(2). A row arriving from the root requests depth 0, and
+    // the floor lifts it to install's depth so it joins the group it was aimed at rather than
+    // landing beside it. Pulling left overrides this — § A10.
+    expect(project({ pointerY: topOfRow(2) + 1, depthSteps: 0 })?.depth).toBe(2)
   })
 
   it('cannot go deeper than one level inside the row above', () => {
@@ -331,9 +333,50 @@ describe('projectTreeDrop — the depth clamp is canNest-aware (§ A7 F1)', () =
   })
 
   it('does not let a far-left drag adopt the subtree that follows it', () => {
-    // The motivating case: in the gap above 'install', dragging as far left as possible must
-    // stay at install's depth rather than becoming install's parent's sibling and swallowing it.
+    // A row lifted to the root from a gap *above* other rows must not collect them on the way
+    // out. It cannot: the position is derived by walking up to the ancestor at the target depth
+    // and landing after it, so the rows below keep the parent they already had. Asserted through
+    // the applied tree, because that is where an adoption would actually show up — the
+    // projection alone could look innocent and still splice a subtree.
     const projection = project({ pointerY: topOfRow(2) + 1, depthSteps: -99 })
+    expect(projection).toMatchObject({ depth: 0, parentId: null })
+
+    const applied = applyTreeDrop(DOC_TREE, 'changelog', projection as TreeDropProjection)
+
+    expect(rowIds(childrenOf(applied, 'guide'))).toEqual(['install', 'usage'])
+    expect(rowIds(childrenOf(applied, 'docs'))).toEqual(['guide', 'api'])
+  })
+})
+
+describe('projectTreeDrop — dragging left lifts a row out of its parent (§ A10)', () => {
+  // The gap between `guide` and its own child `usage`. Every row bounding this gap sits at depth
+  // 1 or deeper, so "the shallowest thing next to me" offers no way out — yet pulling left is
+  // exactly how a user says *take this out of here*.
+  const gapInsideGuide = topOfRow(2)
+
+  it('makes the row a sibling of its parent', () => {
+    const projection = project({ activeId: 'install', pointerY: gapInsideGuide, depthSteps: -1 })
+
+    expect(projection).toMatchObject({ depth: 1, parentId: 'docs', afterId: 'guide' })
+  })
+
+  it('makes the row a sibling of its grandparent when pulled left again', () => {
+    const projection = project({ activeId: 'install', pointerY: gapInsideGuide, depthSteps: -2 })
+
+    expect(projection).toMatchObject({ depth: 0, parentId: null, afterId: 'docs' })
+  })
+
+  it('stops at the root however far left the pointer goes', () => {
+    const projection = project({ activeId: 'install', pointerY: gapInsideGuide, depthSteps: -9 })
+
+    expect(projection).toMatchObject({ depth: 0, parentId: null })
+  })
+
+  it('still drops a row into the group it was aimed at when the pointer never went left', () => {
+    // The guard on the rule above: a floor of 0 applied unconditionally would turn every drop
+    // into a group into a drop *past* it, because a row arriving from the root requests its own
+    // depth of 0 and would now be granted it.
+    const projection = project({ activeId: 'changelog', pointerY: gapInsideGuide, depthSteps: 0 })
 
     expect(projection).toMatchObject({ depth: 2, parentId: 'guide' })
   })

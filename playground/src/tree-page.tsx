@@ -47,6 +47,21 @@ const INITIAL_TREE: readonly TreeItem<Doc>[] = [
 /** Everything can be a parent — except, for the demo, one deliberately locked document. */
 const canNest: TreeNestPredicate = (candidateParent) => candidateParent.id !== 'on-call'
 
+/**
+ * The last visible row belonging to the row at `index` — itself when it has no visible children.
+ *
+ * Descendants are exactly the rows that follow it while staying deeper than it, which is the one
+ * fact a flattened tree gives you for free.
+ */
+const lastRowOfSubtree = (rows: readonly { depth: number }[], index: number): number => {
+  if (index < 0) return index
+
+  const depth = rows[index]?.depth ?? 0
+  let last = index
+  while (last + 1 < rows.length && (rows[last + 1]?.depth ?? 0) > depth) last++
+  return last
+}
+
 const TreeBoard = () => {
   const [items, setItems] = useState(INITIAL_TREE)
   const [collapsedIds, setCollapsedIds] = useState<ReadonlySet<string>>(new Set(['roadmap']))
@@ -142,10 +157,16 @@ const TreeBoard = () => {
    *
    * `afterId` means "below that row"; with no `afterId`, `beforeId` means "above that row" — not
    * below it. An `into` projection sits on the parent row itself.
+   *
+   * The row it follows among its **siblings** is not the row it follows **on screen**: lifting a
+   * document out to the root lands it after that ancestor's entire visible subtree. Drawing the
+   * line straight after the ancestor's own row puts it several rows above where the document
+   * would really appear, which is what makes an un-nest look like the tree ignoring the drag.
    */
   const indicatorAnchorId = projection?.afterId ?? projection?.beforeId ?? projection?.parentId
-  const indicatorRow = rows.findIndex((row) => String(row.id) === String(indicatorAnchorId))
+  const anchorRow = rows.findIndex((row) => String(row.id) === String(indicatorAnchorId))
   const indicatorSitsBelowItsAnchor = projection?.afterId != null
+  const indicatorRow = indicatorSitsBelowItsAnchor ? lastRowOfSubtree(rows, anchorRow) : anchorRow
 
   return (
     <section>

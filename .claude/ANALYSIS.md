@@ -1188,3 +1188,73 @@ at the task boundary, before the commit. And `bun run verify` cannot be green un
 `"types": []` in the base tsconfig ([T1.3](tasks/T1.3-tsconfig.md)) means there are no
 ambient Vitest globals: every test imports what it uses from `vitest` explicitly. That is the
 same rule as the standards' no-namespace-import line, arriving from the config side.
+
+## A10 — Un-nesting was unreachable, and the clamp everyone copies is why (2026-08-08)
+
+*Opened by the user after hands-on testing: "it's complicated to take a child out of its
+parent. if I drag left, it should get out of the parent to the level it is dragged on (brother
+with the parent, or even brother with the parent's parent)."* `[verified]` against our own
+implementation and test suite; the claim about other libraries below is `[unverified]` and must
+not reach the README or the post without a named source.
+
+### The rule that blocked it
+
+`projectTreeDrop` clamped the target depth to `[next.depth, prev.depth + 1]` — the interval
+quoted in every tree-DnD write-up, and what A7 F1 refined for `canNest`. The upper bound is
+sound. The **lower** bound is the problem:
+
+> every row bounding a gap *inside* a group sits at that group's depth or deeper
+
+so `next.depth` can never offer a way out of the group you are already in. Un-nesting was
+reachable only from the **last** gap of a group, where `next` is finally something shallower.
+In practice that means: to lift a document out, first shuffle it to the bottom of its parent,
+*then* drag left. Nobody discovers that, and it reads as the tree ignoring the gesture.
+
+### Why the floor exists at all, and why lowering it is still safe
+
+The floor is not arbitrary. A row cannot sit at the parent's level *between* that parent's
+children — rendered back out, it would appear after the whole subtree, not where it was
+dropped. So the position and the depth genuinely constrain each other.
+
+The resolution is that **coming out of a group is a downward move**, and the projection already
+knew how to express it. `ancestorOrSelfAtDepth(prev, depth)` walks up to the ancestor at the
+requested depth and lands after it — so a shallower depth yields a legal position further down
+the list, without any change to how positions are derived. Nothing is re-parented on the way:
+`applyTreeDrop` splices the active node into the target parent's children, and no existing node
+changes parent, so a subtree cannot be swallowed no matter how far left the pointer goes. That
+last point retired a test whose comment feared exactly that; the fear did not survive being
+checked against `applyTreeDrop`.
+
+### The rule as shipped
+
+The floor drops to the root **only for a deliberate leftward pull** (`Math.round(offsetX /
+indentPx) < 0`), and stays at `next.depth` otherwise.
+
+The asymmetry is load-bearing, and dropping the floor unconditionally is the obvious wrong fix:
+a row dragged in from the root requests depth 0, so an unconditional floor of 0 would grant it
+— turning every drop *into* a group into a drop past it. The horizontal gesture is what
+separates "put this in there" from "take this out of there", and it is the only signal that
+can.
+
+The keyboard inherits it for free, ArrowLeft stepping out one enclosing group at a time to the
+root, which is what "the keyboard uses the same projection as the pointer" is supposed to buy.
+
+### The demo lied about the outcome, which is what made it feel broken
+
+Two bugs read identically from the outside. `afterId` names the row the drop follows **among
+its siblings**, which is not the row it follows **on screen**: lifting a document to the root
+lands it after that ancestor's entire visible subtree. The playground drew the indicator
+immediately below the ancestor's own row — several rows above where the document would actually
+appear. So even the un-nests that *did* work looked like they had gone somewhere else.
+
+Fixed in the playground by advancing the anchor to the last row of its subtree (in a flattened
+tree, the rows that follow it while staying deeper). **Open question for the API:** every
+consumer drawing an indicator needs this same walk, which is an argument for the library
+returning the visual anchor rather than only the sibling one. Parked, not decided — it is an
+API addition and needs its own task.
+
+### Method note
+
+Both halves of this were found by a person dragging a real tree, not by the suite. The 59 tree
+tests all passed throughout, because they assert the projection against *the rule as written*.
+A rule can be implemented perfectly and still be the wrong rule; only trying it tells you.
