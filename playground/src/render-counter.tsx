@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { Profiler, type ReactNode, useEffect, useRef } from 'react'
 
 /**
  * Counts **commits**, from an effect with no dependency array.
@@ -33,3 +33,35 @@ export const CommitBadge = ({ count }: { count: number }) => (
     {count}
   </span>
 )
+
+type CommitLog = Record<string, number>
+
+declare global {
+  interface Window {
+    /** Per-row commit counts, straight from React's Profiler. Read by the QA session. */
+    __dndCommits?: CommitLog
+  }
+}
+
+/**
+ * Records commits **through React's own Profiler**, keyed by row.
+ *
+ * `onRender` fires once per commit of the subtree it wraps, so one Profiler per row turns
+ * "how many rows re-rendered" into a number React itself produced — the same measurement the
+ * React DevTools profiler shows, in a form a QA session can read out of the page.
+ */
+export const ProfiledRow = ({ id, children }: { id: string; children: ReactNode }) => (
+  <Profiler
+    id={id}
+    onRender={(profilerId) => {
+      if (!window.__dndCommits) window.__dndCommits = {}
+      window.__dndCommits[profilerId] = (window.__dndCommits[profilerId] ?? 0) + 1
+    }}
+  >
+    {children}
+  </Profiler>
+)
+
+export const resetCommitLog = (): void => {
+  window.__dndCommits = {}
+}

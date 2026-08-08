@@ -197,7 +197,12 @@ const TreeBoard = () => {
         </ul>
 
         {projection ? (
-          <TreeIndicator mode={projection.mode} depth={projection.depth} rowIndex={indicatorRow} />
+          <TreeIndicator
+            mode={projection.mode}
+            depth={projection.depth}
+            rowIndex={indicatorRow}
+            below={indicatorSitsBelowItsAnchor}
+          />
         ) : null}
       </div>
 
@@ -214,13 +219,15 @@ const TreeIndicator = ({
   mode,
   depth,
   rowIndex,
+  below,
 }: {
   mode: 'into' | 'between'
   depth: number
   rowIndex: number
+  below: boolean
 }) => {
   const isInto = mode === 'into'
-  const top = (rowIndex + (isInto ? 0 : 1)) * ROW_HEIGHT_PX
+  const top = (rowIndex + (isInto || !below ? 0 : 1)) * ROW_HEIGHT_PX
 
   return (
     <div

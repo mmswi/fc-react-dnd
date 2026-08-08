@@ -19,7 +19,7 @@ import { DndProvider } from 'fc-react-dnd/dnd-provider'
 import { SortableList, type SortEndEvent } from 'fc-react-dnd/sortable-list'
 import { useSortable } from 'fc-react-dnd/use-sortable'
 import { useCallback, useMemo, useState } from 'react'
-import { CommitBadge, useCommitCounter } from './render-counter.js'
+import { CommitBadge, ProfiledRow, useCommitCounter } from './render-counter.js'
 import { listStyle, panelStyle, rowStyle } from './theme.js'
 
 /**
@@ -101,7 +101,9 @@ const OurList = () => {
       <SortableList items={items} onSortEnd={handleSortEnd}>
         <ul style={listStyle}>
           {ids.map((id) => (
-            <OurRow key={id} id={id} />
+            <ProfiledRow key={id} id={`ours:${id}`}>
+              <OurRow id={id} />
+            </ProfiledRow>
           ))}
         </ul>
       </SortableList>
@@ -133,7 +135,9 @@ const DndKitList = () => {
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
         <ul style={listStyle}>
           {ids.map((id) => (
-            <DndKitRow key={id} id={id} />
+            <ProfiledRow key={id} id={`dnd-kit:${id}`}>
+              <DndKitRow id={id} />
+            </ProfiledRow>
           ))}
         </ul>
       </SortableContext>
