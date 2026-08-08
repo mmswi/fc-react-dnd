@@ -2,6 +2,7 @@
 
 import { type RefCallback, useEffect, useMemo, useRef } from 'react'
 import { useDndContext } from './internal/context.js'
+import { buildDragHandleProps } from './internal/handle-props.js'
 import {
   projectTreeForDrag,
   type TreeProjectionArgs,
@@ -14,7 +15,7 @@ import {
   type TreeItem,
   type TreeNestPredicate,
 } from './tree.js'
-import type { DndId, DragHandleProps, SensorActivatorProps } from './types.js'
+import type { DndId, DragHandleProps } from './types.js'
 
 /**
  * Wires the pure tree maths to a live drag.
@@ -69,25 +70,6 @@ const describeProjectionByDefault = (projection: TreeDropProjection | null): str
   if (projection.afterId !== null) return `Place after ${String(projection.afterId)}, ${level}.`
   if (projection.beforeId !== null) return `Place before ${String(projection.beforeId)}, ${level}.`
   return `Place at the start, ${level}.`
-}
-
-/** Chains the sensors' activators, the same merge `useDraggable` performs. */
-const mergeActivators = (activators: readonly SensorActivatorProps[]): SensorActivatorProps => {
-  const pointerDownHandlers = activators.map((props) => props.onPointerDown).filter(Boolean)
-  const keyDownHandlers = activators.map((props) => props.onKeyDown).filter(Boolean)
-
-  return {
-    ...(pointerDownHandlers.length > 0 && {
-      onPointerDown: (event) => {
-        for (const handler of pointerDownHandlers) handler?.(event)
-      },
-    }),
-    ...(keyDownHandlers.length > 0 && {
-      onKeyDown: (event) => {
-        for (const handler of keyDownHandlers) handler?.(event)
-      },
-    }),
-  }
 }
 
 type CachedRowProps = {
@@ -149,20 +131,13 @@ export const useTreeDrop = <Extra>(options: UseTreeDropOptions<Extra>): UseTreeD
         store.registerDraggable(id, node)
         store.registerMeasuredRow(id, node)
       },
-      handleProps: {
-        role: 'button',
-        tabIndex: 0,
-        'aria-roledescription': draggableRoleDescription,
-        'aria-describedby': instructionsId,
-        'aria-disabled': undefined,
-        draggable: false,
-        style: { touchAction: 'none' },
-        ...mergeActivators(
-          sensors.map((sensor) =>
-            sensor.activate({ draggableId: id, beginDrag: (init) => store.beginDrag(id, init) }),
-          ),
-        ),
-      },
+      handleProps: buildDragHandleProps({
+        id,
+        store,
+        sensors,
+        instructionsId,
+        draggableRoleDescription,
+      }),
     })
 
     return { byId, build }

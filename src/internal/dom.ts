@@ -1,3 +1,5 @@
+'use client'
+
 import type { Rect } from '../types.js'
 
 /**

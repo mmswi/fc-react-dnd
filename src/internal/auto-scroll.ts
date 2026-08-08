@@ -1,3 +1,5 @@
+'use client'
+
 import type { Point, Rect, Translate } from '../types.js'
 import type { DragStore } from './store.js'
 
@@ -163,12 +165,16 @@ export const createAutoScroller = (store: DragStore): AutoScroller => {
     const pointer = livePointer()
     if (!pointer || !container) return
 
-    const intent = computeScrollIntent({ pointer, box: readMetrics(container) })
+    const box = readMetrics(container)
+    const intent = computeScrollIntent({ pointer, box })
     const shouldScroll = intent.x !== 0 || intent.y !== 0
 
     if (shouldScroll) {
-      container.scrollLeft += intent.x
-      container.scrollTop += intent.y
+      // From the offsets already read, not `+=`. A read-modify-write reads `scrollTop` *after*
+      // writing `scrollLeft`, which is a layout read interleaved with a layout write — every
+      // frame of every drag. All the reads happened above; these are only writes.
+      container.scrollLeft = box.scrollLeft + intent.x
+      container.scrollTop = box.scrollTop + intent.y
       // Everything below the scroll just moved, so `over` computed against the cached rects is
       // now wrong. This is the step naive autoscroll skips, and it is why the drop lands one
       // row off after a scroll.

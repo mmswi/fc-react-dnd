@@ -1,5 +1,6 @@
 'use client'
 
+import { DRAG_ACTIVATION_KEYS, ESCAPE_KEY } from './internal/keys.js'
 import {
   DRAG_CANCEL_REASONS,
   DRAG_DIRECTIONS,
@@ -22,8 +23,6 @@ import {
  */
 
 const DEFAULT_INDENT_PX = 24
-const ACTIVATION_KEYS = [' ', 'Enter'] as const
-const ESCAPE_KEY = 'Escape'
 
 const DIRECTION_BY_ARROW_KEY: Record<string, DragDirection> = {
   ArrowUp: DRAG_DIRECTIONS.up,
@@ -118,7 +117,7 @@ export const keyboardSensor = (options: KeyboardSensorOptions = {}): Sensor => {
         // one that is already over.
         if (drag && !drag.session.isActive()) teardown()
         const current = drag
-        const isActivationKey = (ACTIVATION_KEYS as readonly string[]).includes(event.key)
+        const isActivationKey = DRAG_ACTIVATION_KEYS.includes(event.key)
 
         if (!current) {
           if (!isActivationKey) return

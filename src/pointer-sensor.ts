@@ -1,5 +1,6 @@
 'use client'
 
+import { ESCAPE_KEY } from './internal/keys.js'
 import {
   DRAG_CANCEL_REASONS,
   type DragSession,
@@ -20,7 +21,6 @@ import {
 const DEFAULT_ACTIVATION_DISTANCE_PX = 5
 const DEFAULT_ACTIVATION_TOLERANCE_PX = 5
 const PRIMARY_MOUSE_BUTTON = 0
-const ESCAPE_KEY = 'Escape'
 const CLICK_SUPPRESSION_WINDOW_MS = 0
 
 export type PointerSensorOptions = {

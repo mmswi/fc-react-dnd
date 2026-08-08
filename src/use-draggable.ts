@@ -2,6 +2,7 @@
 
 import { type RefCallback, useCallback, useEffect, useRef } from 'react'
 import { useDndContext } from './internal/context.js'
+import { buildDragHandleProps } from './internal/handle-props.js'
 import { useStoreSelector } from './internal/use-store-selector.js'
 import type { DndData, DndId, DragHandleProps, SensorActivatorProps, Translate } from './types.js'
 
@@ -27,7 +28,6 @@ import type { DndData, DndId, DragHandleProps, SensorActivatorProps, Translate }
  */
 
 const NO_DATA: DndData = {}
-const NO_ACTIVATOR_PROPS: SensorActivatorProps = {}
 
 export type UseDraggableOptions = {
   readonly id: DndId
@@ -53,25 +53,6 @@ export type UseDraggableResult = {
   readonly isDragging: boolean
   /** `null` unless this item is the one being dragged and `trackTransform` is on. */
   readonly transform: Translate | null
-}
-
-/** Chains every handler for a given event so no sensor's activator is silently dropped. */
-const mergeActivators = (activators: readonly SensorActivatorProps[]): SensorActivatorProps => {
-  const pointerDownHandlers = activators.map((props) => props.onPointerDown).filter(Boolean)
-  const keyDownHandlers = activators.map((props) => props.onKeyDown).filter(Boolean)
-
-  return {
-    ...(pointerDownHandlers.length > 0 && {
-      onPointerDown: (event) => {
-        for (const handler of pointerDownHandlers) handler?.(event)
-      },
-    }),
-    ...(keyDownHandlers.length > 0 && {
-      onKeyDown: (event) => {
-        for (const handler of keyDownHandlers) handler?.(event)
-      },
-    }),
-  }
 }
 
 export const useDraggable = (options: UseDraggableOptions): UseDraggableResult => {
@@ -111,30 +92,17 @@ export const useDraggable = (options: UseDraggableOptions): UseDraggableResult =
     return isActive ? state.translate : null
   })
 
-  const sensorActivators = disabled
-    ? NO_ACTIVATOR_PROPS
-    : mergeActivators([
-        ...sensors.map((sensor) =>
-          sensor.activate({
-            draggableId: id,
-            beginDrag: (init) => store.beginDrag(id, init),
-          }),
-        ),
-        activatorProps ?? NO_ACTIVATOR_PROPS,
-      ])
-
   return {
     setNodeRef,
-    handleProps: {
-      role: 'button',
-      tabIndex: 0,
-      'aria-roledescription': draggableRoleDescription,
-      'aria-describedby': instructionsId,
-      'aria-disabled': disabled || undefined,
-      draggable: false,
-      style: { touchAction: 'none' },
-      ...sensorActivators,
-    },
+    handleProps: buildDragHandleProps({
+      id,
+      store,
+      sensors,
+      instructionsId,
+      draggableRoleDescription,
+      disabled,
+      extraActivators: activatorProps,
+    }),
     isDragging,
     transform,
   }

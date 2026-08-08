@@ -274,6 +274,42 @@ describe('the auto-scroll loop', () => {
     expect(second.container.scrollTop).toBe(afterOneLoop)
   })
 
+  it('reads every metric before it writes anything — perf invariant 2', async () => {
+    // Interleaving a read with a write forces the browser to recompute layout on each pair, and
+    // this loop runs every frame of a drag. The ordering is the invariant, so the ordering is
+    // what gets asserted — not merely that the scroll happened.
+    const scene = buildScrollableScene()
+    const order: string[] = []
+
+    const realRect = scene.container.getBoundingClientRect.bind(scene.container)
+    scene.container.getBoundingClientRect = () => {
+      order.push('read')
+      return realRect()
+    }
+    for (const property of ['scrollTop', 'scrollLeft', 'scrollHeight', 'clientHeight'] as const) {
+      const value = scene.container[property]
+      Object.defineProperty(scene.container, property, {
+        configurable: true,
+        get: () => {
+          order.push('read')
+          return value
+        },
+        set: () => {
+          order.push('write')
+        },
+      })
+    }
+
+    scene.store.beginDrag('item', { pointer: { x: 200, y: CONTAINER_HEIGHT_PX - 5 } })
+    scene.scroller.start()
+    await nextFrame()
+
+    const firstWrite = order.indexOf('write')
+    const lastRead = order.lastIndexOf('read')
+    expect(firstWrite).toBeGreaterThan(-1)
+    expect(lastRead).toBeLessThan(firstWrite)
+  })
+
   it('stops scrolling once the container reaches its end', async () => {
     const scene = buildScrollableScene()
     Object.defineProperty(scene.container, 'scrollHeight', { value: 400, configurable: true })
