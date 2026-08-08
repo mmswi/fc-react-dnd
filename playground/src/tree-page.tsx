@@ -135,9 +135,15 @@ const TreeBoard = () => {
     })
   }
 
-  const indicatorRow = rows.findIndex(
-    (row) => row.id === (projection?.afterId ?? projection?.beforeId ?? projection?.parentId),
-  )
+  /**
+   * Which row the indicator hangs off, and on which side.
+   *
+   * `afterId` means "below that row"; with no `afterId`, `beforeId` means "above that row" — not
+   * below it. An `into` projection sits on the parent row itself.
+   */
+  const indicatorAnchorId = projection?.afterId ?? projection?.beforeId ?? projection?.parentId
+  const indicatorRow = rows.findIndex((row) => String(row.id) === String(indicatorAnchorId))
+  const indicatorSitsBelowItsAnchor = projection?.afterId != null
 
   return (
     <section>

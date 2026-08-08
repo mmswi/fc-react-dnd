@@ -73,7 +73,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && bun run --filter playground typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "biome check .",

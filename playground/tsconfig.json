@@ -9,7 +9,10 @@
     "noEmit": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
-    "paths": { "fc-react-dnd/*": ["../src/*"] }
+    "paths": {
+      "fc-react-dnd/*": ["../src/*"]
+    },
+    "types": ["node"]
   },
   "include": ["src", "vite.config.ts"]
 }
