@@ -12,14 +12,15 @@ import { useDndMonitor } from 'fc-react-dnd/use-dnd-monitor'
 import { useTreeDrop } from 'fc-react-dnd/use-tree-drop'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { panelStyle } from './theme.js'
+import { addChild, type Doc } from './tree-data.js'
 
 /**
  * A document tree, not a folder tree.
  *
  * Any document can become a parent: dropping one onto another gives that document a `children`
- * array. There is no separate "folder" kind, which is § A7 D2 made visible.
+ * array. There is no separate "folder" kind, which is § A7 D2 made visible — and the per-row
+ * add button is the same fact from the other direction: every row offers it, including leaves.
  */
-type Doc = { title: string }
 
 const INDENT_PX = 24
 const ROW_HEIGHT_PX = 34
@@ -51,6 +52,20 @@ const canNest: TreeNestPredicate = (candidateParent) => candidateParent.id !== L
 
 /** Wider middle band than the library default — these rows are only 34px tall. */
 const NEST_BAND_FRACTION = 0.25
+
+/** The drag handle's DOM id, so a newly added row can be focused by id after it mounts. */
+const rowHandleId = (id: string) => `tree-row-${id}`
+
+const addButtonStyle = {
+  width: 22,
+  height: 22,
+  lineHeight: 1,
+  border: '1px solid #e2e8f0',
+  borderRadius: 4,
+  background: '#fff',
+  color: '#475569',
+  cursor: 'pointer',
+} as const
 
 const TreeBoard = () => {
   const [items, setItems] = useState(INITIAL_TREE)
@@ -143,6 +158,46 @@ const TreeBoard = () => {
     })
   }
 
+  /**
+   * Ids climb monotonically rather than being derived from the tree's size, so a node keeps its
+   * id for the life of the page and a drop can never resolve against a reused one.
+   */
+  const nextDocNumber = useRef(1)
+
+  const addDocument = useCallback((parentId: string | null) => {
+    const number = nextDocNumber.current
+    nextDocNumber.current += 1
+    const id = `doc-${number}`
+
+    setItems((current) => addChild(current, parentId, { id, title: `New document ${number}` }))
+
+    // A child added to a collapsed branch would be invisible, and the button would read as
+    // broken. Expanding is a mount, which the A6 policy explicitly survives.
+    if (parentId !== null) {
+      setCollapsedIds((current) => {
+        if (!current.has(parentId)) return current
+        const next = new Set(current)
+        next.delete(parentId)
+        return next
+      })
+    }
+
+    setRowToFocus(id)
+  }, [])
+
+  /**
+   * Focus follows the new row, so adding by keyboard leaves you on the thing you just made
+   * rather than on a button three rows away. Applied in an effect because the row does not
+   * exist until the commit that renders it.
+   */
+  const [rowToFocus, setRowToFocus] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (rowToFocus === null) return
+    document.getElementById(rowHandleId(rowToFocus))?.focus()
+    setRowToFocus(null)
+  }, [rowToFocus])
+
   // The projection names the screen row to draw against — deriving it from the sibling ids is
   // the trap this demo fell into three times before the library started answering it (§ A10).
   const indicatorRow = projection
@@ -158,6 +213,16 @@ const TreeBoard = () => {
         maths, so a cycle is never offered rather than being rejected afterwards. <em>On-call</em>{' '}
         declines children, so the depth stops one level short beside it. Hover a collapsed node for{' '}
         {AUTO_EXPAND_DELAY_MS}ms to expand it mid-drag.
+      </p>
+      <p>
+        <strong>+</strong> adds a document inside that row — every row offers it, including leaves,
+        because there is no folder kind. <em>Add top-level document</em> appends to the root.
+      </p>
+
+      <p>
+        <button type="button" onClick={() => addDocument(null)}>
+          Add top-level document
+        </button>
       </p>
 
       <div style={{ position: 'relative', maxWidth: 460 }}>
@@ -185,6 +250,7 @@ const TreeBoard = () => {
                   )}
                   <button
                     type="button"
+                    id={rowHandleId(id)}
                     ref={ref}
                     {...handleProps}
                     style={{
@@ -204,6 +270,18 @@ const TreeBoard = () => {
                         {' 🔒'}
                       </span>
                     ) : null}
+                  </button>
+                  {/*
+                    Its own button, not part of the handle: a pointerdown here must add a
+                    document rather than begin a drag.
+                  */}
+                  <button
+                    type="button"
+                    onClick={() => addDocument(id)}
+                    aria-label={`Add a document inside ${titleById.get(id) ?? id}`}
+                    style={addButtonStyle}
+                  >
+                    +
                   </button>
                 </div>
               </li>
