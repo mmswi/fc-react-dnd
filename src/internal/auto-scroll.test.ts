@@ -7,9 +7,18 @@ import {
   computeScrollIntent,
   createAutoScroller,
   findScrollableAncestor,
+  readMetrics,
   type ScrollBoxMetrics,
 } from './auto-scroll.js'
 import { createDragStore } from './store.js'
+
+/** Far enough down the page that a doubled scroll offset lands the pointer in the edge band. */
+const SCROLLED_BY_PX = 200
+
+/** jsdom reports every scroll metric as zero and has no layout to derive them from. */
+const defineMetric = (element: Element, metric: string, value: number): void => {
+  Object.defineProperty(element, metric, { value, configurable: true })
+}
 
 /** A 400×400 box at the origin, scrolled to the middle of a 2000×2000 canvas. */
 const scrollBox = (overrides: Partial<ScrollBoxMetrics> = {}): ScrollBoxMetrics => ({
@@ -150,6 +159,55 @@ describe('findScrollableAncestor', () => {
     document.body.append(leaf)
 
     expect(findScrollableAncestor(leaf)).toBe(document.scrollingElement ?? document.documentElement)
+  })
+})
+
+describe('readMetrics', () => {
+  it('measures an ordinary element from its own border box', () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    mockElementRect(container, { left: 30, top: 120, width: 400, height: 300 })
+
+    expect(readMetrics(container).rect).toEqual({ left: 30, top: 120, width: 400, height: 300 })
+  })
+
+  it('places the scrolled viewport at the origin, because pointers are already viewport-relative', () => {
+    // The root element's border box starts at the top of the *document*, so once the page has
+    // scrolled its rect reports a negative top. Pointer coordinates are `clientX/clientY` —
+    // already relative to the viewport — so subtracting that negative top would add the scroll
+    // offset a second time and place the pointer far below where the user is actually pointing.
+    const viewport = document.documentElement
+    mockElementRect(viewport, { left: 0, top: -SCROLLED_BY_PX, width: 1000, height: 4000 })
+
+    expect(readMetrics(viewport).rect.top).toBe(0)
+  })
+
+  it('leaves an already-scrolled page still when the pointer is inside it', () => {
+    // The reported bug, end to end: drag once so the page scrolls, then start a second drag.
+    // Measured through the document frame this pointer reads as `y + SCROLLED_BY_PX`, so a
+    // pointer sitting a comfortable EDGE_CLEARANCE_PX above the fold is mistaken for one pinned
+    // to the very bottom, and the page runs away from under the user's hand.
+    //
+    // The clearance is deliberately far wider than the edge band: a pointer that is genuinely
+    // near the edge *should* scroll, so the position has to be one where only the doubled
+    // offset can explain any movement at all.
+    const viewport = document.documentElement
+    const VIEWPORT_HEIGHT_PX = 700
+    const EDGE_CLEARANCE_PX = SCROLLED_BY_PX
+    mockElementRect(viewport, { left: 0, top: -SCROLLED_BY_PX, width: 1000, height: 4000 })
+    defineMetric(viewport, 'clientHeight', VIEWPORT_HEIGHT_PX)
+    defineMetric(viewport, 'scrollTop', SCROLLED_BY_PX)
+    defineMetric(viewport, 'scrollHeight', 4000)
+
+    const pointerWellClearOfTheBottom = { x: 500, y: VIEWPORT_HEIGHT_PX - EDGE_CLEARANCE_PX }
+    expect(EDGE_CLEARANCE_PX).toBeGreaterThan(AUTO_SCROLL_EDGE_PX)
+
+    const intent = computeScrollIntent({
+      pointer: pointerWellClearOfTheBottom,
+      box: readMetrics(viewport),
+    })
+
+    expect(intent.y).toBe(0)
   })
 })
 

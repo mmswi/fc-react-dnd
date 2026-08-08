@@ -1,10 +1,12 @@
 import { DndProvider } from 'fc-react-dnd/dnd-provider'
+import { DragOverlay } from 'fc-react-dnd/drag-overlay'
 import {
   applyTreeDrop,
   flattenTree,
   type TreeItem,
   type TreeNestPredicate,
 } from 'fc-react-dnd/tree'
+import { useActiveDrag } from 'fc-react-dnd/use-active-drag'
 import { useDndMonitor } from 'fc-react-dnd/use-dnd-monitor'
 import { useTreeDrop } from 'fc-react-dnd/use-tree-drop'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -212,12 +214,70 @@ const TreeBoard = () => {
         ) : null}
       </div>
 
+      {/*
+        A tree row stays in its slot while it is dragged — rows here are measure-only, and moving
+        them would move the very geometry the projection is computed from. So the thing that
+        follows the cursor has to be a separate element, and without one the only feedback is a
+        thin line jumping around a list that never moves.
+      */}
+      <DragOverlay>
+        <TreeDragPreview
+          titleById={titleById}
+          depth={projection?.depth ?? 0}
+          mode={projection?.mode}
+        />
+      </DragOverlay>
+
       <pre style={{ ...panelStyle, marginTop: 16 }}>
         {projection
           ? JSON.stringify(projection, null, 2)
           : 'The live projection appears here: parentId, index, depth, and the neighbours by id.'}
       </pre>
     </section>
+  )
+}
+
+/**
+ * What the cursor carries, showing the two things the indicator alone cannot: which document is
+ * in hand, and — through the indent — the depth it would land at.
+ */
+const TreeDragPreview = ({
+  titleById,
+  depth,
+  mode,
+}: {
+  titleById: ReadonlyMap<string, string>
+  depth: number
+  mode?: 'into' | 'between'
+}) => {
+  const active = useActiveDrag()
+  if (!active) return null
+
+  const id = String(active.id)
+  const isNesting = mode === 'into'
+
+  return (
+    <div
+      style={{
+        marginLeft: depth * INDENT_PX,
+        height: ROW_HEIGHT_PX,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '0 12px',
+        borderRadius: 4,
+        background: '#fff',
+        border: `2px solid ${isNesting ? '#2563eb' : '#cbd5e1'}`,
+        boxShadow: '0 8px 24px rgba(15,23,42,0.18)',
+        cursor: 'grabbing',
+        font: 'inherit',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span aria-hidden="true">⠿</span>
+      {titleById.get(id) ?? id}
+      {isNesting ? <span style={{ color: '#2563eb', fontSize: 12 }}>↳ into</span> : null}
+    </div>
   )
 }
 

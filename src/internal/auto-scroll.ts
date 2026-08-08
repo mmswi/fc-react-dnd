@@ -126,11 +126,33 @@ export const findScrollableAncestor = (element: Element): Element => {
   return document.scrollingElement ?? document.documentElement
 }
 
-const readMetrics = (element: Element): ScrollBoxMetrics => {
+/**
+ * Whether this box *is* the viewport rather than a box drawn inside it.
+ *
+ * Both identities are checked because `findScrollableAncestor` can return either: a browser
+ * answers `document.scrollingElement`, and jsdom, which does not implement it, falls through to
+ * `documentElement`.
+ */
+const isViewport = (element: Element): boolean =>
+  element === document.scrollingElement || element === document.documentElement
+
+export const readMetrics = (element: Element): ScrollBoxMetrics => {
   // One batch of reads, no writes among them.
   const { top, left, width, height } = element.getBoundingClientRect()
+
+  // The root element's border box is measured from the top of the *document*, so a scrolled page
+  // reports a negative top — while pointers arrive as `clientX/clientY`, already relative to the
+  // viewport. Subtracting that negative top adds the scroll offset a second time, so a pointer
+  // resting mid-screen is read as sitting `scrollY` pixels lower than it is. Once that lands in
+  // the bottom edge band the page scrolls itself with the pointer nowhere near an edge, which is
+  // what "the scroll gets triggered" looks like on the second drag of a session. In viewport
+  // coordinates the viewport starts at the origin, by definition.
+  const box = isViewport(element)
+    ? { top: 0, left: 0, width: element.clientWidth, height: element.clientHeight }
+    : { top, left, width, height }
+
   return {
-    rect: { top, left, width, height },
+    rect: box,
     scrollLeft: element.scrollLeft,
     scrollTop: element.scrollTop,
     scrollWidth: element.scrollWidth,

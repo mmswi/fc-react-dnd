@@ -149,32 +149,47 @@ const DndKitList = () => {
   )
 }
 
-export const ComparisonPage = () => (
-  <section>
-    <h2>Comparison</h2>
-    <p>
-      The same {ITEM_COUNT}-item list, built twice, with the same re-render counter on every row.
-      Drag a row a little way down each list and compare the numbers.
-    </p>
-    <p>
-      Both dragged rows climb steadily, and both should — they follow your pointer. The difference
-      is everything <em>else</em>: on the left only the rows actually being pushed out of the way
-      re-render, and on the right all {ITEM_COUNT} do, on every pointer move.
-    </p>
-    <p style={panelStyle}>
-      Baseline: <code>@dnd-kit/core</code> 6.3.1, <code>@dnd-kit/sortable</code> 10.0.0. Recorded
-      because the comparison is only meaningful against a pinned target.
-    </p>
+export const ComparisonPage = () => {
+  // The counters only ever climb, so after a few drags both sides read as large numbers whose
+  // ratio means nothing. Remounting via `key` is what makes a comparison a comparison: one drag
+  // on each side, from zero, is the only reading that answers "how much work per drag?".
+  const [runId, setRunId] = useState(0)
 
-    <div style={{ display: 'grid', gap: 24, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
-      <div>
-        <h3>fc-react-dnd</h3>
-        <OurList />
+  return (
+    <section>
+      <h2>Comparison</h2>
+      <p>
+        The same {ITEM_COUNT}-item list, built twice, with the same re-render counter on every row.
+        Drag a row a little way down each list and compare the numbers.
+      </p>
+      <p>
+        Both dragged rows climb steadily, and both should — they follow your pointer. The difference
+        is everything <em>else</em>: on the left only the rows actually being pushed out of the way
+        re-render, and on the right all {ITEM_COUNT} do, on every pointer move.
+      </p>
+      <p style={panelStyle}>
+        Baseline: <code>@dnd-kit/core</code> 6.3.1, <code>@dnd-kit/sortable</code> 10.0.0. Recorded
+        because the comparison is only meaningful against a pinned target.
+      </p>
+
+      <p>
+        <button type="button" onClick={() => setRunId((current) => current + 1)}>
+          Reset counters
+        </button>{' '}
+        Counters accumulate across drags. Reset, then drag <strong>once</strong> on each side — the
+        per-drag numbers are the ones worth comparing.
+      </p>
+
+      <div style={{ display: 'grid', gap: 24, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+        <div>
+          <h3>fc-react-dnd</h3>
+          <OurList key={runId} />
+        </div>
+        <div>
+          <h3>dnd-kit</h3>
+          <DndKitList key={runId} />
+        </div>
       </div>
-      <div>
-        <h3>dnd-kit</h3>
-        <DndKitList />
-      </div>
-    </div>
-  </section>
-)
+    </section>
+  )
+}
