@@ -106,6 +106,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 
 - [x] [T11.1](tasks/T11.1-indent-px-single-source.md) — one indent width, not two: `keyboardSensor({ indentPx })` and `useTreeDrop({ indentPx })` are separate constants, so a non-default indent makes one arrow press jump two depth levels (or none)
 - [x] [T11.2](tasks/T11.2-tree-drop-indicator.md) — ship the drop indicator: a tree built from the library alone renders no drag feedback at all
+- [x] [T11.4](tasks/T11.4-server-render-and-hydration.md) — the server story, tested instead of asserted: renders under SSR, and hydrates with no mismatch
 
 ## Backlog (explicitly out of v0.1 scope)
 

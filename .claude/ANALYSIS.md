@@ -1336,3 +1336,74 @@ knowing.
   and no explicit option, nothing in the drag interprets a horizontal offset.
 - **Two trees under one provider with different indents**: last mount wins. Cross-tree drags
   are already Backlog (§ A7 F10), and one drag belongs to one tree.
+
+## A12 — What of this library exists on a server, and for how long (2026-08-09)
+
+The user asked for the store to be `null` during SSR, on the grounds that a store built on the
+server is a memory leak. Reasonable instinct, and it turned out to be measurable rather than
+arguable, so it was measured.
+
+### The numbers [verified]
+
+Measured 2026-08-09 with `bun` (v1.3.5, React 19.2.8), using `Bun.gc(true)` for a synchronous
+collection either side of the sample:
+
+| Measurement | Result |
+| --- | --- |
+| One `createDragStore(...)`, held alive | **~973 bytes** (50,000 instances, heap delta / count) |
+| 5,000 `renderToString` of a provider + 3-row sortable list | heap delta **negative** — nothing retained |
+
+The negative delta is not a rounding artefact to explain away; it is the shape you get when the
+sample retains nothing and the baseline GC left a little garbage behind. There is no growth over
+5,000 renders, which is the only claim being made.
+
+### Why there is nothing to leak
+
+`createDragStore` is a closure over three `Map`s, three `Set`s and a state object. It touches no
+module-level registry, starts no timer, and adds no listener — `queueMicrotask` appears once, in
+`onRegistrationRemoved`, behind `if (!state.origin) return`, and no drag can be active during a
+server render. The only reference to the store is the fiber's `useState` hook cell, so the whole
+thing is garbage the moment `renderToString` returns.
+
+The rule the store's header states — *never at module level* — is about **mutable state shared
+between concurrent requests**, not about allocation. A per-request store costs ~1 KB and is
+collected; a module-level one is one object every request writes to at once.
+
+### What *is* long-lived on a server [verified]
+
+`DEFAULT_SENSORS` — `Object.freeze([pointerSensor(), keyboardSensor()])` at module scope in
+`dnd-provider.tsx`. One array, one process, for the life of the server. It is safe because the
+sensor factories are stateless and touch no DOM at construction (`ssr.test.tsx` renders with
+`typeof window === 'undefined'` and would throw otherwise), and it is deliberate: it is what makes
+the default referentially stable, which § A3.5 requires.
+
+So the honest answer to "what of this library lives on my server" is: **two frozen sensor objects,
+permanently, by design. The store, per request, briefly.**
+
+### Decision: leave it alone [decided]
+
+No null store, no SSR stub.
+
+The cost of the change is not the environment branch — it is that a second `DragStore`
+implementation is a hydration-mismatch generator. TypeScript enforces a stub's *shape*; nothing
+enforces that its `getState()` agrees with what the real store's initial state produces. Add a
+field to `DragStoreState` with a non-idle default, forget the stub, and the server HTML diverges
+from the client's silently. That is a worse failure than 1 KB of collected garbage.
+
+There is a pointed detail here. React 19's own hydration-mismatch message lists its first
+suspected cause as:
+
+> A server/client branch `if (typeof window !== 'undefined')`.
+
+which is precisely the mechanism the change would have introduced.
+
+If it is ever reopened, the shape to build is **one frozen, inert store shared by every server
+render** — not `store: DragStore | null` in the context, which puts a null branch in every hook
+forever. And note that `typeof window === 'undefined'` answers "is there a DOM", not "is this a
+server render": any jsdom-backed SSR setup takes the client branch regardless.
+
+### Tested, not asserted
+
+Both halves now run in CI, under T11.4: `src/ssr.test.tsx` (`@vitest-environment node`) and
+`src/hydration.test.tsx`. The second one's first test is a deliberate mismatch, because a
+hydration suite that collects zero errors looks identical whether it is passing or inert.
