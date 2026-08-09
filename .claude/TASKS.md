@@ -105,7 +105,7 @@ acceptance criteria hold **and** `bun run verify` is green.
 ## P11 — Defects found after v0.1
 
 - [x] [T11.1](tasks/T11.1-indent-px-single-source.md) — one indent width, not two: `keyboardSensor({ indentPx })` and `useTreeDrop({ indentPx })` are separate constants, so a non-default indent makes one arrow press jump two depth levels (or none)
-- [ ] [T11.2](tasks/T11.2-tree-drop-indicator.md) — ship the drop indicator: a tree built from the library alone renders no drag feedback at all
+- [x] [T11.2](tasks/T11.2-tree-drop-indicator.md) — ship the drop indicator: a tree built from the library alone renders no drag feedback at all
 
 ## Backlog (explicitly out of v0.1 scope)
 

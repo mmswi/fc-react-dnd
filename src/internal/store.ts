@@ -139,6 +139,9 @@ export type DragStore = {
    */
   setCrossAxisStepPx: (px: number) => void
 
+  /** The same number, for `TreeDropIndicator` — so the indent is authored in exactly one place. */
+  getCrossAxisStepPx: () => number
+
   setCollisionDetection: (collisionDetection: CollisionDetection) => void
 }
 
@@ -558,6 +561,8 @@ export const createDragStore = (options: DragStoreOptions): DragStore => {
     setCrossAxisStepPx: (px) => {
       crossAxisStepPx = px
     },
+
+    getCrossAxisStepPx: () => crossAxisStepPx,
 
     setCollisionDetection: (next) => {
       collisionDetection = next

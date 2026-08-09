@@ -66,6 +66,10 @@
       "types": "./dist/tree.d.ts",
       "default": "./dist/tree.js"
     },
+    "./tree-drop-indicator": {
+      "types": "./dist/tree-drop-indicator.d.ts",
+      "default": "./dist/tree-drop-indicator.js"
+    },
     "./use-tree-drop": {
       "types": "./dist/use-tree-drop.d.ts",
       "default": "./dist/use-tree-drop.js"

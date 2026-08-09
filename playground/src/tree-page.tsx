@@ -3,10 +3,10 @@ import { DragOverlay } from 'fc-react-dnd/drag-overlay'
 import {
   applyTreeDrop,
   flattenTree,
-  type TreeIndicatorEdge,
   type TreeItem,
   type TreeNestPredicate,
 } from 'fc-react-dnd/tree'
+import { TreeDropIndicator } from 'fc-react-dnd/tree-drop-indicator'
 import { useActiveDrag } from 'fc-react-dnd/use-active-drag'
 import { useDndMonitor } from 'fc-react-dnd/use-dnd-monitor'
 import { useTreeDrop } from 'fc-react-dnd/use-tree-drop'
@@ -198,12 +198,6 @@ const TreeBoard = () => {
     setRowToFocus(null)
   }, [rowToFocus])
 
-  // The projection names the screen row to draw against — deriving it from the sibling ids is
-  // the trap this demo fell into three times before the library started answering it (§ A10).
-  const indicatorRow = projection
-    ? rows.findIndex((row) => String(row.id) === String(projection.indicator.rowId))
-    : -1
-
   return (
     <section>
       <h2>Tree</h2>
@@ -234,7 +228,12 @@ const TreeBoard = () => {
 
             return (
               <li key={id} style={{ height: ROW_HEIGHT_PX }}>
-                <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                {/*
+                  The measured row spans the full list width and shows depth as padding inside
+                  it, which is what `TreeDropIndicator` needs to have a fixed origin to indent
+                  from. The handle stays on the button: measured and grabbed are two jobs.
+                */}
+                <div ref={ref} style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
                   <span style={{ width: row.depth * INDENT_PX }} aria-hidden="true" />
                   {hasChildren ? (
                     <button
@@ -251,7 +250,6 @@ const TreeBoard = () => {
                   <button
                     type="button"
                     id={rowHandleId(id)}
-                    ref={ref}
                     {...handleProps}
                     style={{
                       ...style,
@@ -289,13 +287,7 @@ const TreeBoard = () => {
           })}
         </ul>
 
-        {projection && indicatorRow !== -1 ? (
-          <TreeIndicator
-            edge={projection.indicator.edge}
-            depth={projection.indicator.depth}
-            rowIndex={indicatorRow}
-          />
-        ) : null}
+        <TreeDropIndicator projection={projection} />
       </div>
 
       {/*
@@ -372,36 +364,6 @@ const TreeDragPreview = ({
         <span style={{ color: '#64748b', fontSize: 12 }}>top level</span>
       )}
     </div>
-  )
-}
-
-const TreeIndicator = ({
-  edge,
-  depth,
-  rowIndex,
-}: {
-  edge: TreeIndicatorEdge
-  depth: number
-  rowIndex: number
-}) => {
-  const isOver = edge === 'over'
-  const top = (edge === 'below' ? rowIndex + 1 : rowIndex) * ROW_HEIGHT_PX
-
-  return (
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'absolute',
-        left: depth * INDENT_PX + 20,
-        right: 0,
-        top: isOver ? rowIndex * ROW_HEIGHT_PX : top,
-        height: isOver ? ROW_HEIGHT_PX : 2,
-        background: isOver ? 'rgba(37,99,235,0.12)' : '#2563eb',
-        border: isOver ? '2px solid #2563eb' : undefined,
-        borderRadius: isOver ? 4 : 0,
-        pointerEvents: 'none',
-      }}
-    />
   )
 }
 

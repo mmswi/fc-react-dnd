@@ -241,6 +241,21 @@ projection is computed from — but it means a tree wired up without the two pie
 broken rather than minimal. You need both: a **line** (or box) from `projection.indicator`, and
 an **overlay** carrying something under the cursor.
 
+The example draws the line by hand to show what the data means. You do not have to — the same
+thing ships as a component in `fc-react-dnd/tree-drop-indicator`, and replaces that whole block
+with:
+
+```tsx
+<TreeDropIndicator projection={projection} />
+```
+
+It positions itself from the rects the store already measured, so it needs no positioned
+ancestor and no row height, and it takes the indent from the `indentPx` you gave `useTreeDrop`.
+One contract: **the element you attach `getRowProps(id).ref` to spans the full width of the
+list**, with depth as padding inside it — rows are measured through that ref, so a ref on an
+already-indented child has no fixed origin to indent from. Putting `handleProps` on an inner
+button is fine.
+
 `projection.indicator` gives you `{ rowId, edge, depth }` already resolved into screen terms:
 which visible row to draw against, whether the line goes above it, below it, or as a box over
 it, and at what indent. Do not derive that from `afterId`/`beforeId` — those are sibling-space,
@@ -314,6 +329,7 @@ against them without rendering anything.
 | `fc-react-dnd/use-sortable` | `useSortable`, `UseSortableOptions`, `UseSortableResult`, `SORTABLE_SETTLE_TRANSITION` |
 | `fc-react-dnd/tree` | `TreeItem`, `TreeRow`, `FlattenedTree`, `FlattenTreeOptions`, `flattenTree`, `TREE_DROP_MODES`, `TreeDropMode`, `TreeNestPredicate`, `TreeDropProjection`, `TREE_INDICATOR_EDGES`, `TreeIndicatorEdge`, `TreeDropIndicator`, `ProjectTreeDropArgs`, `DEFAULT_TREE_INDENT_PX`, `DEFAULT_NEST_BAND_FRACTION`, `projectTreeDrop`, `applyTreeDrop` |
 | `fc-react-dnd/use-tree-drop` | `useTreeDrop`, `UseTreeDropOptions`, `UseTreeDropResult`, `TreeRowProps` |
+| `fc-react-dnd/tree-drop-indicator` | `TreeDropIndicator`, `TreeDropIndicatorProps` |
 | `fc-react-dnd/types` | `DndId`, `Point`, `Translate`, `Rect`, `DndData`, `DragNodeStyle`, `DRAG_CANCEL_REASONS`, `DragCancelReason`, `DRAG_DIRECTIONS`, `DragDirection`, `ActiveDragInfo`, `DragActive`, `DragOver`, `DragStartEvent`, `DragMoveEvent`, `DragOverEvent`, `DragEndEvent`, `DragCancelEvent`, `CollisionActive`, `DroppableCandidate`, `CollisionArgs`, `CollisionDetection`, `DirectionalTarget`, `DragSession`, `DragBeginInit`, `SensorContext`, `SensorActivatorProps`, `Sensor`, `DragHandleProps`, `DndAnnouncements`, `DndAccessibility`, `DndMonitorListeners` |
 
 ### `DndProvider`
