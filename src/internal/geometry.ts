@@ -24,6 +24,7 @@ export const translateRect = (rect: Rect, translate: Translate): Rect => ({
   height: rect.height,
 })
 
+// Pythagora's theorem a^2 + b^2 = c^2 - Math.hypot gives you c
 export const distanceBetweenPoints = (a: Point, b: Point): number =>
   Math.hypot(b.x - a.x, b.y - a.y)
 
@@ -54,6 +55,7 @@ export const translatesAreEqual = (a: Translate, b: Translate): boolean =>
  */
 const DEFAULT_CROSS_AXIS_PENALTY = 2
 
+// +value moves down or right an element | -value moves left or up
 type Axis = { readonly main: 'x' | 'y'; readonly cross: 'x' | 'y'; readonly sign: 1 | -1 }
 
 const AXIS_BY_DIRECTION: Record<DragDirection, Axis> = {
