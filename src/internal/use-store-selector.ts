@@ -52,8 +52,10 @@ export const useStoreSelector = <State, Slice>(
     const state = store.getState()
     const cached = cache.current
 
-    // The store mints a new state object per transition, so the same state object *through the
-    // same selector* cannot have produced anything different — the cheapest possible exit.
+    // Not a shortcut for store notifications: the store mints a new state object per transition,
+    // so this misses on every move. It pays off on React's *repeat* reads of one snapshot — the
+    // tearing check after a render, and twice more on mount in DEV — where the same state through
+    // the same selector cannot have produced anything different, so a `===` replaces a call.
     // Both halves are load-bearing: keyed on state alone, a component that swaps its selector
     // between renders keeps getting the previous selector's answer.
     const isCacheStillValid = cached !== null && cached.state === state && cached.select === select
