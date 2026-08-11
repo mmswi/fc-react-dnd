@@ -191,10 +191,26 @@ type PositionedRow = {
   readonly rect: Rect
 }
 
-type Gap = {
-  readonly prev: TreeRow | null
-  readonly next: TreeRow | null
-}
+const DROP_TARGETS = {
+  /** The pointer is in a nestable row's middle band, so the drop goes inside that row. */
+  into: 'into',
+  /** The pointer is in the space between two rows; either side is absent at the ends. */
+  gap: 'gap',
+} as const
+
+type DropTarget =
+  | { readonly kind: typeof DROP_TARGETS.into; readonly row: TreeRow }
+  | {
+      readonly kind: typeof DROP_TARGETS.gap
+      readonly prev: TreeRow | null
+      readonly next: TreeRow | null
+    }
+
+const gapBetween = (prev: TreeRow | null, next: TreeRow | null): DropTarget => ({
+  kind: DROP_TARGETS.gap,
+  prev,
+  next,
+})
 
 const clamp = (value: number, lowest: number, highest: number): number =>
   Math.min(Math.max(value, lowest), highest)
@@ -251,15 +267,13 @@ const resolveTarget = (
   activeRow: TreeRow,
   canNest: TreeNestPredicate,
   nestBandFraction: number,
-): { intoRow: TreeRow | null; gap: Gap } => {
+): DropTarget => {
   const first = positioned[0]
   const last = positioned[positioned.length - 1]
-  if (!first || !last) return { intoRow: null, gap: { prev: null, next: null } }
+  if (!first || !last) return gapBetween(null, null)
 
-  if (pointerY < first.rect.top) return { intoRow: null, gap: { prev: null, next: first.row } }
-  if (pointerY >= last.rect.top + last.rect.height) {
-    return { intoRow: null, gap: { prev: last.row, next: null } }
-  }
+  if (pointerY < first.rect.top) return gapBetween(null, first.row)
+  if (pointerY >= last.rect.top + last.rect.height) return gapBetween(last.row, null)
 
   const hitIndex = positioned.findIndex(
     (entry) => pointerY >= entry.rect.top && pointerY < entry.rect.top + entry.rect.height,
@@ -268,7 +282,7 @@ const resolveTarget = (
   if (hitIndex === -1) {
     const above = [...positioned].reverse().find((entry) => entry.rect.top <= pointerY)
     const below = positioned.find((entry) => entry.rect.top > pointerY)
-    return { intoRow: null, gap: { prev: above?.row ?? null, next: below?.row ?? null } }
+    return gapBetween(above?.row ?? null, below?.row ?? null)
   }
 
   const hit = positioned[hitIndex] as PositionedRow
@@ -276,21 +290,115 @@ const resolveTarget = (
   const nextRow = positioned[hitIndex + 1]?.row ?? null
   const offsetIntoRow = pointerY - hit.rect.top
 
+  // A row that will not take children has no middle band at all: it is the before-gap or the
+  // after-gap, and the exact half belongs to the after-gap.
   if (!canNest(hit.row, activeRow)) {
     const isInLowerHalf = offsetIntoRow >= hit.rect.height / 2
-    return isInLowerHalf
-      ? { intoRow: null, gap: { prev: hit.row, next: nextRow } }
-      : { intoRow: null, gap: { prev: previousRow, next: hit.row } }
+    return isInLowerHalf ? gapBetween(hit.row, nextRow) : gapBetween(previousRow, hit.row)
   }
 
+  // Asserted to the pixel: the exact `top + band` belongs to the middle, and the exact
+  // `bottom - band` belongs to the after-gap.
   const bandPx = hit.rect.height * nestBandFraction
-  if (offsetIntoRow < bandPx) return { intoRow: null, gap: { prev: previousRow, next: hit.row } }
-  if (offsetIntoRow >= hit.rect.height - bandPx) {
-    return { intoRow: null, gap: { prev: hit.row, next: nextRow } }
-  }
+  if (offsetIntoRow < bandPx) return gapBetween(previousRow, hit.row)
+  if (offsetIntoRow >= hit.rect.height - bandPx) return gapBetween(hit.row, nextRow)
 
-  return { intoRow: hit.row, gap: { prev: null, next: null } }
+  return { kind: DROP_TARGETS.into, row: hit.row }
 }
+
+/**
+ * How deep the drop may go in this gap. The floor comes from the row below, the ceiling from the
+ * row above, and `null` means the two crossed — the gap admits no legal position at all, which
+ * happens between a node and its own first child when that node will not take children (§ A7 F2).
+ */
+const allowedDepthRange = (args: {
+  readonly prev: TreeRow
+  readonly next: TreeRow | null
+  readonly activeRow: TreeRow
+  readonly isPullingLeft: boolean
+  readonly canNest: TreeNestPredicate
+}): { readonly lowest: number; readonly highest: number } | null => {
+  const { prev, next, activeRow, isPullingLeft, canNest } = args
+
+  // We need a deliberate leftward pull to drop the floor to the root, so that "take this out of
+  // here" is reachable from anywhere in a group: every row bounding a gap *inside* a group sits at
+  // the group's depth or deeper, so a floor of `next.depth` would leave un-nesting available only
+  // from the group's last row. It never drops by default — a row arriving from the root already
+  // requests depth 0, and granting that would turn every drop into a group into a drop past it.
+  const lowest = isPullingLeft ? 0 : (next?.depth ?? 0)
+  // `prev.depth + 1` *is* nesting into prev, so it obeys the same predicate the middle band does.
+  const highest = canNest(prev, activeRow) ? prev.depth + 1 : prev.depth
+
+  return lowest > highest ? null : { lowest, highest }
+}
+
+const nestInto = (intoRow: TreeRow, positioned: readonly PositionedRow[]): TreeDropProjection => {
+  const firstChild = positioned.find((entry) => entry.row.parentId === intoRow.id)
+
+  return {
+    parentId: intoRow.id,
+    index: 0,
+    depth: intoRow.depth + 1,
+    mode: TREE_DROP_MODES.into,
+    afterId: null,
+    // The same id the gap below an expanded parent produces. Without it the two "same position"
+    // paths agree on the index and disagree the moment an edit shifts it.
+    beforeId: firstChild?.row.id ?? null,
+    // The box goes on the target row at its own indent — anchoring via `beforeId` would put it on
+    // the target's first child, which reads as the into state not triggering at all.
+    indicator: { rowId: intoRow.id, edge: TREE_INDICATOR_EDGES.over, depth: intoRow.depth },
+  }
+}
+
+/** The gap above the first row: nothing to nest into up there, so its depth is fixed. */
+const dropAboveFirstRow = (next: TreeRow): TreeDropProjection => ({
+  parentId: next.parentId,
+  index: next.index,
+  depth: next.depth,
+  mode: TREE_DROP_MODES.between,
+  afterId: null,
+  beforeId: next.id,
+  indicator: { rowId: next.id, edge: TREE_INDICATOR_EDGES.above, depth: next.depth },
+})
+
+const dropAsFirstChildOf = (
+  prev: TreeRow,
+  depth: number,
+  followingSibling: TreeRow | null,
+): TreeDropProjection => ({
+  parentId: prev.id,
+  index: 0,
+  depth,
+  mode: TREE_DROP_MODES.between,
+  afterId: null,
+  beforeId: followingSibling?.id ?? null,
+  // Becoming the parent's first child puts the line directly under the parent's own row. There
+  // may be no neighbour ids at all here, and an anchor chain falling back to `parentId` with an
+  // "above" default draws in the gap above the parent — which is what "it says between, but goes
+  // into" looks like.
+  indicator: { rowId: prev.id, edge: TREE_INDICATOR_EDGES.below, depth },
+})
+
+const dropAfterSubtreeOf = (
+  anchor: TreeRow,
+  depth: number,
+  followingSibling: TreeRow | null,
+  positioned: readonly PositionedRow[],
+): TreeDropProjection => ({
+  parentId: anchor.parentId,
+  index: anchor.index + 1,
+  depth,
+  mode: TREE_DROP_MODES.between,
+  afterId: anchor.id,
+  beforeId: followingSibling?.id ?? null,
+  // Landing after the anchor means landing after its whole subtree — for an un-nest that is rows
+  // away from the pointer, and drawing it there is the truthful choice.
+  indicator: {
+    rowId: lastRowOfVisibleSubtree(positioned, anchor).id,
+    edge: TREE_INDICATOR_EDGES.below,
+    depth,
+  },
+})
 
 export const projectTreeDrop = (args: ProjectTreeDropArgs): TreeDropProjection | null => {
   const {
@@ -317,98 +425,36 @@ export const projectTreeDrop = (args: ProjectTreeDropArgs): TreeDropProjection |
   }
   if (positioned.length === 0) return ROOT_PROJECTION
 
+  // How many indent widths the row has been pulled sideways, and so what depth the user is asking
+  // for. Dragging left is how they say "take this out of here".
   const depthSteps = Math.round(offsetX / indentPx)
   const requestedDepth = activeRow.depth + depthSteps
-  const { intoRow, gap } = resolveTarget(positioned, pointerY, activeRow, canNest, nestBandFraction)
 
-  if (intoRow) {
-    const firstChild = positioned.find((entry) => entry.row.parentId === intoRow.id)
-    return {
-      parentId: intoRow.id,
-      index: 0,
-      depth: intoRow.depth + 1,
-      mode: TREE_DROP_MODES.into,
-      afterId: null,
-      // The same id the gap below an expanded parent would produce. Without this the two
-      // "same position" paths agree on the index and disagree the moment an edit shifts it.
-      beforeId: firstChild?.row.id ?? null,
-      // The box goes on the target row at its own indent — anchoring via `beforeId` puts it on
-      // the target's first child instead, which reads as the into state not triggering at all.
-      indicator: { rowId: intoRow.id, edge: TREE_INDICATOR_EDGES.over, depth: intoRow.depth },
-    }
-  }
+  const target = resolveTarget(positioned, pointerY, activeRow, canNest, nestBandFraction)
+  if (target.kind === DROP_TARGETS.into) return nestInto(target.row, positioned)
 
-  const { prev, next } = gap
+  const { prev, next } = target
+  if (!prev) return next ? dropAboveFirstRow(next) : ROOT_PROJECTION
 
-  // The gap above the first row: there is nothing to nest into above it, so its depth is fixed.
-  if (!prev) {
-    if (!next) return ROOT_PROJECTION
-    return {
-      parentId: next.parentId,
-      index: next.index,
-      depth: next.depth,
-      mode: TREE_DROP_MODES.between,
-      afterId: null,
-      beforeId: next.id,
-      indicator: { rowId: next.id, edge: TREE_INDICATOR_EDGES.above, depth: next.depth },
-    }
-  }
+  const depthRange = allowedDepthRange({
+    prev,
+    next,
+    activeRow,
+    isPullingLeft: depthSteps < 0,
+    canNest,
+  })
+  if (!depthRange) return null
 
-  // Dragging left is how a user says "take this out of here", and the row below can never grant
-  // it: every row bounding a gap *inside* a group sits at the group's depth or deeper, so a floor
-  // of `next.depth` leaves un-nesting reachable only from the last row of a group — you have to
-  // shuffle the row to the bottom of its parent before you are allowed to lift it out.
-  //
-  // A deliberate leftward pull lowers the floor to the root. Landing there means sliding past the
-  // rest of the group, because a row cannot sit at the parent's level *between* that parent's
-  // children — coming out of a group is a downward move, and this is what it looks like.
-  //
-  // The floor only drops for a leftward pull, never by default: a row arriving from the root
-  // requests depth 0, and granting that unconditionally would turn every drop *into* a group into
-  // a drop past it.
-  const isPullingLeft = depthSteps < 0
-  const lowestDepth = isPullingLeft ? 0 : (next?.depth ?? 0)
-  // `prev.depth + 1` *is* nesting into prev, so it obeys the same predicate the middle band does.
-  const highestDepth = canNest(prev, activeRow) ? prev.depth + 1 : prev.depth
-  // An empty interval means the gap admits no legal position at all — between a node and its own
-  // first child, when that node will not take children (§ A7 F2).
-  if (lowestDepth > highestDepth) return null
+  const depth = clamp(requestedDepth, depthRange.lowest, depthRange.highest)
+  // Only a row at the same depth is a sibling the drop lands before; a deeper or shallower one
+  // belongs to a different parent.
+  const followingSibling = next !== null && next.depth === depth ? next : null
 
-  const depth = clamp(requestedDepth, lowestDepth, highestDepth)
-  const followsAtSameDepth = next !== null && next.depth === depth
-
-  if (depth === prev.depth + 1) {
-    return {
-      parentId: prev.id,
-      index: 0,
-      depth,
-      mode: TREE_DROP_MODES.between,
-      afterId: null,
-      beforeId: followsAtSameDepth ? next.id : null,
-      // Becoming the parent's first child means the line sits directly under the parent's own
-      // row. There may be no neighbour ids at all here, and an anchor chain that falls back to
-      // `parentId` with an "above" default draws in the gap above the parent — a different gap
-      // entirely, which is what "it says between, but goes into" looks like.
-      indicator: { rowId: prev.id, edge: TREE_INDICATOR_EDGES.below, depth },
-    }
-  }
+  const isFirstChildOfPrev = depth === prev.depth + 1
+  if (isFirstChildOfPrev) return dropAsFirstChildOf(prev, depth, followingSibling)
 
   const anchor = ancestorOrSelfAtDepth(prev, depth, flattened.locationById)
-  return {
-    parentId: anchor.parentId,
-    index: anchor.index + 1,
-    depth,
-    mode: TREE_DROP_MODES.between,
-    afterId: anchor.id,
-    beforeId: followsAtSameDepth ? next.id : null,
-    // Landing after the anchor means landing after its whole subtree — for an un-nest this is
-    // rows away from the pointer, and drawing there is the truthful choice.
-    indicator: {
-      rowId: lastRowOfVisibleSubtree(positioned, anchor).id,
-      edge: TREE_INDICATOR_EDGES.below,
-      depth,
-    },
-  }
+  return dropAfterSubtreeOf(anchor, depth, followingSibling, positioned)
 }
 
 /**

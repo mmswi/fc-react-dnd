@@ -42,20 +42,18 @@ export const translatesAreEqual = (a: Translate, b: Translate): boolean =>
 /**
  * How much harder a sideways offset counts than distance along the direction of travel.
  *
- * Above 1, an aligned candidate beats a euclidean-closer one that drifts off the axis — which
- * is what makes ArrowDown feel like "the next item down" instead of "the nearest thing that
- * happens to be lower". Only the ordering matters, not the exact figure.
- */
-/**
- * The default weight, for candidates laid out on a grid or scattered on a page.
+ * Above 1, an aligned candidate beats a euclidean-closer one that drifts off the axis — which is
+ * what makes ArrowDown feel like "the next item down" rather than "the nearest thing that happens
+ * to be lower". Only the ordering matters, not the exact figure.
  *
- * A **tree** wants zero: rows are offset horizontally *by depth*, so penalising the cross axis
- * makes ArrowUp prefer a shallow row three positions away over the deep row immediately above.
- * The caller decides, because only the caller knows the layout.
+ * This is the default, for candidates on a grid or scattered on a page. A **tree** passes zero,
+ * because its rows are offset horizontally *by depth* and any penalty makes ArrowUp prefer a
+ * shallow row three positions away over the deep row immediately above. The caller decides, since
+ * only the caller knows the layout.
  */
 const DEFAULT_CROSS_AXIS_PENALTY = 2
 
-// +value moves down or right an element | -value moves left or up
+/** `sign` points the main axis the way the key does: +1 is down or right, -1 is up or left. */
 type Axis = { readonly main: 'x' | 'y'; readonly cross: 'x' | 'y'; readonly sign: 1 | -1 }
 
 const AXIS_BY_DIRECTION: Record<DragDirection, Axis> = {

@@ -2,7 +2,7 @@
 
 import { type RefCallback, useEffect, useMemo, useRef } from 'react'
 import { useDndContext } from './internal/context.js'
-import { buildDragHandleProps } from './internal/handle-props.js'
+import { buildDragHandleProps } from './internal/drag-handle-props.js'
 import { buildNodeStyle } from './internal/node-style.js'
 import {
   projectTreeForDrag,
@@ -42,10 +42,9 @@ export type TreeRowProps = {
   readonly handleProps: DragHandleProps
   readonly isDragging: boolean
   /**
-   * Pass it straight to `style`. No `transform` here and there never will be while tree mode is
-   * indicator-only — but `touch-action` still has to reach the element, and a consumer who
-   * spreads `{...handleProps}` and then sets `style` would drop it. Same object shape as the
-   * other hooks so no row type is the odd one out.
+   * Pass it straight to `style`. No `transform` while tree mode is indicator-only, but
+   * `touch-action` still has to reach the element — a consumer spreading `{...handleProps}` and
+   * then setting `style` would drop it.
    */
   readonly style: DragNodeStyle
 }
@@ -107,13 +106,9 @@ export const useTreeDrop = <Extra>(options: UseTreeDropOptions<Extra>): UseTreeD
     [items, collapsedIds, indentPx, nestBandFraction, canNest],
   )
 
-  /**
-   * The keyboard sensor cannot know how wide one level is, and this is the only place that
-   * number is authored — so publish it rather than letting the sensor carry a constant that has
-   * to happen to match (`ANALYSIS.md` § A11).
-   *
-   * A registration, so it never notifies and costs no render (perf invariant 5).
-   */
+  // This is the only place the indent is authored, so publish it for `keyboard-sensor.ts` to read
+  // through the session rather than letting it carry a constant that has to happen to match
+  // (`ANALYSIS.md` § A11). Configuration, not drag state — so it never notifies (perf invariant 5).
   const resolvedIndentPx = indentPx ?? DEFAULT_TREE_INDENT_PX
 
   useEffect(() => {
@@ -132,23 +127,19 @@ export const useTreeDrop = <Extra>(options: UseTreeDropOptions<Extra>): UseTreeD
 
   /**
    * Row props are cached per id so the `ref` a row receives is the **same function** across
-   * renders. A fresh ref every render makes React detach and re-attach on every render, and
-   * mid-drag a detach is a removal, which cancels the drag (§ A6).
+   * renders — a fresh one every render makes React detach and re-attach every render, and
+   * mid-drag a detach reads as a removal, which cancels the drag (§ A6).
    *
-   * The builder lives inside the memo with the cache, so the dependency list is the honest set
-   * of things baked into the closures it produces — change any of them and the cache is thrown
-   * away with them.
+   * The builder lives inside the memo with the cache, so the dependency list is the honest set of
+   * things baked into the closures it produces: change any of them and the cache goes with them.
    */
   const rowCache = useMemo(() => {
     const byId = new Map<DndId, CachedRowProps>()
 
     const build = (id: DndId): CachedRowProps => ({
       node: null,
-      // Registers, and **never** unregisters. A consumer writing
-      // `ref={(node) => { myRef.current = node; ref(node) }}` hands React a new function every
-      // render, so React detaches and re-attaches on every render — and mid-drag a detach that
-      // unregistered would be a removal, which cancels the drag. Unregistration is the lifetime
-      // effect's job, below.
+      // Registers and never unregisters, for the reason above. Unregistering is the lifetime
+      // effect's job, further down.
       ref: (node) => {
         const cached = byId.get(id)
         if (cached) cached.node = node
@@ -157,8 +148,12 @@ export const useTreeDrop = <Extra>(options: UseTreeDropOptions<Extra>): UseTreeD
         store.registerMeasuredRow(id, node)
       },
       handleProps: buildDragHandleProps({
-        id,
-        store,
+        sensorContext: {
+          draggableId: id,
+          // What a sensor calls once it decides the gesture is a real drag — `pointer-sensor.ts`
+          // after its activation threshold, `keyboard-sensor.ts` on Space/Enter.
+          beginDrag: (init) => store.beginDrag(id, init),
+        },
         sensors,
         instructionsId,
         draggableRoleDescription,

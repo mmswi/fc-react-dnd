@@ -107,6 +107,9 @@ acceptance criteria hold **and** `bun run verify` is green.
 - [x] [T11.1](tasks/T11.1-indent-px-single-source.md) — one indent width, not two: `keyboardSensor({ indentPx })` and `useTreeDrop({ indentPx })` are separate constants, so a non-default indent makes one arrow press jump two depth levels (or none)
 - [x] [T11.2](tasks/T11.2-tree-drop-indicator.md) — ship the drop indicator: a tree built from the library alone renders no drag feedback at all
 - [x] [T11.4](tasks/T11.4-server-render-and-hydration.md) — the server story, tested instead of asserted: renders under SSR, and hydrates with no mismatch
+- [ ] [T11.7](tasks/T11.7-navigational-comments-and-activate-rename.md) — make the call graph readable: 1113 comment lines and exactly **one** names another module in this library, so tracing "what happens on pointerdown" is 11 hops across 5 files with no signposts. Add backlinks at the deferred-call seams (additive, guarded by a test) and rename the colliding internal `activate` in `pointer-sensor.ts`
+- [x] [T11.8](tasks/T11.8-readability-rewrite.md) — **the readability rewrite**: remove the hops instead of signposting them. Promoted T11.7's two deferred sections with the user's go (2026-08-11) — flattened the re-entrant sensor hop, reordered `store.ts` by lifecycle, split `projectTreeDrop` into named steps, and compressed the rationale essays in place. Public API byte-identical, guarded by the new `src/public-api.test.ts`
+- [ ] [T11.9](tasks/T11.9-tree-drop-indicator-name-collision.md) — two public-surface corrections found by the T11.8 standards sweep, both breaking so both out of that task's scope: `TreeDropIndicator` names two different exports (the anchor **type** in `tree.ts`, the **component** in `tree-drop-indicator.tsx`), and `SensorContext.draggableId` is written at both call sites and read by nothing
 
 ## Backlog (explicitly out of v0.1 scope)
 

@@ -30,13 +30,11 @@ type CacheEntry = {
 }
 
 /**
- * Two levels, and the inner one is the correction § A7 F6 makes to the § A5 rule.
- *
- * Keyed on the store state alone, a mid-drag auto-expand would return a **stale** projection by
- * construction: the projection is a function of the consumer's rows, and those rows changed
- * while the state object did not have to. Keyed on the rows alone, two providers rendering the
- * same array would overwrite each other. So: outer key the per-provider state, inner key the
- * consumer's `items` array.
+ * Both keys are load-bearing. Outer: the per-provider state object — this cache is module-level,
+ * so a key two providers shared would let them overwrite each other's entry (§ A5). Inner: the
+ * consumer's `items` array, because a mid-drag auto-expand changes the rows while the state
+ * object need not change at all, and keying on state alone would serve a stale projection
+ * (§ A7 F6).
  */
 const projectionCache = new WeakMap<DragStoreState, WeakMap<object, CacheEntry>>()
 
@@ -58,18 +56,13 @@ const computeProjection = <Extra>(
     collapsedIds: args.collapsedIds,
   })
 
-  // What the drop is aimed at vertically, and it is genuinely different for the two sensors —
-  // the same number would make one of them wrong.
-  //
-  // A pointer drag aims with the **cursor**: that is what the user is looking at, and it moves
-  // continuously through rows and the gaps between them.
-  //
-  // A keyboard drag has no cursor, and stepping to a row's *centre* would land in that row's
-  // middle band every time — so ArrowLeft/ArrowRight would have nothing to clamp between and
-  // whole depths would be unreachable, which is precisely what § A7 F9's reachability invariant
-  // exists to catch. Anchoring on the dragged row's **leading edge** puts each step on a gap
-  // boundary, and D1 makes that total: 'into' is still reachable as the deepest rung of the gap
-  // below a nestable row.
+  // What the drop is aimed at vertically, and the two sensors genuinely need different numbers.
+  // A pointer drag aims with the **cursor** — what the user is looking at, moving continuously
+  // through rows and the gaps between them. A keyboard drag has none, and stepping to a row's
+  // centre would land in its middle band every time, leaving ArrowLeft/ArrowRight nothing to
+  // clamp between and whole depths unreachable (§ A7 F9). So it anchors on the dragged row's
+  // **leading edge**, which puts every step on a gap boundary; 'into' stays reachable as the
+  // deepest rung of the gap below a nestable row.
   const pointerY =
     origin.pointer !== null ? origin.pointer.y + translate.y : origin.rect.top + translate.y
 

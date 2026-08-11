@@ -86,10 +86,15 @@ export const pointerSensor = (options: PointerSensorOptions = {}): Sensor => {
   // running must not start a second drag or hijack the first.
   let interaction: Interaction | null = null
 
-  const activate = (pointer: Point): void => {
+  // The press is already running; this is the moment it becomes a drag — the threshold was
+  // crossed, or the hold timer fired.
+  const promoteToDrag = (pointer: Point): void => {
     const current = interaction
     if (!current || current.session) return
 
+    // `context` comes from the handle that was pressed: `use-draggable.ts` and `use-tree-drop.ts`
+    // both build it, and `beginDrag` there is `store.beginDrag(id, init)`. `null` means the store
+    // refused — a drag is already running, or this draggable is disabled.
     const session = current.context.beginDrag({ pointer })
     if (!session) {
       teardown()
@@ -136,7 +141,7 @@ export const pointerSensor = (options: PointerSensorOptions = {}): Sensor => {
 
     // The drag starts from where the press was, not from where the threshold happened to be
     // crossed — otherwise every drag would jump by the activation distance on its first frame.
-    activate(current.startPoint)
+    promoteToDrag(current.startPoint)
     // …and the move that crossed the threshold is reported immediately, so the item is already
     // under the pointer on the first rendered frame rather than one event behind it. Reported
     // here rather than by re-entering the dragging handler, because this listener is passive
@@ -227,7 +232,7 @@ export const pointerSensor = (options: PointerSensorOptions = {}): Sensor => {
 
     if (isHoldToDrag) {
       current.delayTimer = setTimeout(() => {
-        activate(current.startPoint)
+        promoteToDrag(current.startPoint)
       }, activationDelayMs)
     }
   }

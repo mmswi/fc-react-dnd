@@ -30,11 +30,11 @@ type SnapshotCache<State, Slice> = {
 /**
  * Subscribe to a slice of a store.
  *
- * The returned slice keeps its **reference** while the comparison says it is unchanged. That
- * is a correctness requirement rather than an optimisation: React calls `getSnapshot` again
- * outside the render for its tearing check, and twice more on mount in DEV, so a selector
- * returning a fresh object every call is an infinite loop — which is exactly what React's DEV
- * warning about caching `getSnapshot` is detecting.
+ * The returned slice keeps its **reference** for as long as the comparison says it is unchanged.
+ * That is correctness, not an optimisation: React calls `getSnapshot` again outside the render
+ * for its tearing check, and twice more on mount in DEV, so a selector returning a fresh object
+ * every call is an infinite loop — exactly what React's "getSnapshot should be cached" warning
+ * detects.
  */
 export const useStoreSelector = <State, Slice>(
   store: ReadableStore<State>,
@@ -45,19 +45,18 @@ export const useStoreSelector = <State, Slice>(
 
   // Deliberately *not* memoised, and deliberately closing over this render's `select`. React
   // re-reads the latest `getSnapshot` when deciding whether a notification matters
-  // (`ReactFiberHooks.js:1878`), so a component may swap its selector between renders and the
-  // very next comparison uses the new one. A `useCallback` over a ref would leave one render
-  // reading the previous selector.
+  // (`ReactFiberHooks.js:1878`), so a component may swap its selector between renders and the very
+  // next comparison uses the new one. A `useCallback` over a ref would leave one render reading
+  // the previous selector.
   const getSnapshot = (): Slice => {
     const state = store.getState()
     const cached = cache.current
 
-    // Not a shortcut for store notifications: the store mints a new state object per transition,
-    // so this misses on every move. It pays off on React's *repeat* reads of one snapshot — the
-    // tearing check after a render, and twice more on mount in DEV — where the same state through
-    // the same selector cannot have produced anything different, so a `===` replaces a call.
-    // Both halves are load-bearing: keyed on state alone, a component that swaps its selector
-    // between renders keeps getting the previous selector's answer.
+    // This misses on every move by design — the store mints a new state object per transition. It
+    // pays off on React's *repeat* reads of one snapshot, where the same state through the same
+    // selector cannot have produced anything different, so a `===` replaces a call. Both halves
+    // matter: keyed on state alone, a component that swapped its selector between renders would
+    // keep getting the previous selector's answer.
     const isCacheStillValid = cached !== null && cached.state === state && cached.select === select
     if (isCacheStillValid) return cached.slice
 
