@@ -9,7 +9,7 @@ A React drag-and-drop library written from scratch. Performance, maintainability
 1. **Load the `mihai-coding-standards` skill (Skill tool) before writing or reviewing any code in this repo.** Every task ends by walking that skill's closing checklist against the diff. Mandatory, not advisory.
 2. **Load the `tdd` skill (Skill tool) before creating any component, hook, function, module, or bug fix.** The first artifact of every implementation task is a *failing* test, not an implementation. Red → green → refactor, one behaviour at a time. Mandatory, not advisory — a task whose first commit-worthy change is production code was done wrong.
 3. **Work the task board.** `.claude/TASKS.md` is the canonical board — see "Task workflow" below. No coding without a task; no task marked done without verification.
-4. **No barrel files. Anywhere. Including `src/index.ts`.** This package deliberately has no root entry — the public API is the explicit subpath list in `package.json#exports`. Consumers import from the source module: `import { useDraggable } from 'fc-react-dnd/use-draggable'`.
+4. **Exactly one barrel — `src/index.ts` — and no others.** The root entry re-exports every public module **by name** (never `export *`), so a consumer can write `import { DndProvider, useSortable, applySortEnd } from 'fc-react-dnd'`. Added 2026-08-12 at the user's call, reversing this repo's original "no root entry, on purpose" rule; the reasoning it replaces is in `.claude/tasks/T11.12-root-entry.md`. Everything else is unchanged: **no re-export hub anywhere else**, `internal/` modules import each other directly, and every subpath stays published and supported. Under a bundler root and subpath are equivalent — `sideEffects: false` plus ESM drops the rest, measured in `.claude/tasks/T11.12-root-entry.md`. `src/public-api.test.ts` pins the root's exports, so adding one to a module and forgetting the barrel fails the suite.
 5. **ESM-only, zero runtime dependencies.** No CJS build, no bundler in the build chain — `tsc` emits `dist/` per-file, mirroring `src/` 1:1.
 6. **Never publish to npm without the user's explicit go.** `npm pack --dry-run` is the ceiling for autonomous work.
 
@@ -66,6 +66,7 @@ Headless, store-first. All drag state lives in a plain external store (`src/inte
 
 | Public subpath (`fc-react-dnd/…`) | File | Main exports |
 | --- | --- | --- |
+| *(root)* `fc-react-dnd` | `src/index.ts` | The whole surface, re-exported by name. **Not server-importable** — it pulls in the `'use client'` modules below |
 | `dnd-provider` | `src/dnd-provider.tsx` | `DndProvider`, `DndProviderProps` |
 | `use-draggable` | `src/use-draggable.ts` | `useDraggable`, `UseDraggableOptions`, `UseDraggableResult` |
 | `use-droppable` | `src/use-droppable.ts` | `useDroppable`, `UseDroppableOptions`, `UseDroppableResult` |
@@ -77,7 +78,9 @@ Headless, store-first. All drag state lives in a plain external store (`src/inte
 | `collision` | `src/collision.ts` | `closestCenter` — the one shipped strategy; the `CollisionDetection` type keeps custom ones pluggable |
 | `sortable-list` | `src/sortable-list.tsx` | `SortableList`, `SortableListProps` (per-list context + `onSortEnd`) |
 | `use-sortable` | `src/use-sortable.ts` | `useSortable`, `UseSortableOptions`, `UseSortableResult` |
+| `list` | `src/list.ts` | **Pure list math**: `applySortEnd` — applies a `SortEndEvent` to your array, resolving by neighbour id (T11.11) |
 | `tree` | `src/tree.ts` | **Pure tree math**: `flattenTree`, `projectTreeDrop`, `applyTreeDrop`, tree types |
+| `tree-drop-indicator` | `src/tree-drop-indicator.tsx` | `TreeDropIndicator` — draws `projection.indicator`; the **type** of that anchor is `TreeDropIndicatorType` in `tree` (T11.9) |
 | `use-tree-drop` | `src/use-tree-drop.ts` | `useTreeDrop` — live `TreeDropProjection` + `getRowProps(id)` row wiring (rows are measure-only, never droppables); re-renders only when the projection changes |
 | `types` | `src/types.ts` | Shared public types (`DndId`, events, `Sensor`, `CollisionDetection`, …) |
 
