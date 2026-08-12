@@ -63,7 +63,10 @@ export const keyboardSensor = (options: KeyboardSensorOptions = {}): Sensor => {
     current.handle.removeEventListener('blur', current.onBlur)
   }
 
-  const beginDrag = (context: SensorContext, handle: HTMLElement): void => {
+  const pickUp = (context: SensorContext, handle: HTMLElement): void => {
+    // `context` comes from the handle that was focused: `use-draggable.ts` and `use-tree-drop.ts`
+    // both build it, and `beginDrag` there is `store.beginDrag(id, init)`.
+    //
     // No pointer origin: a keyboard drag has no edge distance to compute, so auto-scroll is off
     // by construction and the keyboard path uses `scrollIntoView` instead.
     const session = context.beginDrag({ pointer: null })
@@ -138,7 +141,7 @@ export const keyboardSensor = (options: KeyboardSensorOptions = {}): Sensor => {
           if (!isActivationKey) return
           // Without this, Space scrolls the page out from under the drag being started.
           event.preventDefault()
-          beginDrag(context, event.currentTarget)
+          pickUp(context, event.currentTarget)
           return
         }
 

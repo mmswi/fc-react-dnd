@@ -2,7 +2,7 @@
 
 import { type RefCallback, useCallback, useEffect, useRef } from 'react'
 import { useDndContext } from './internal/context.js'
-import { buildDragHandleProps } from './internal/handle-props.js'
+import { buildDragHandleProps } from './internal/drag-handle-props.js'
 import { buildNodeStyle } from './internal/node-style.js'
 import { useStoreSelector } from './internal/use-store-selector.js'
 import type {
@@ -17,22 +17,16 @@ import type {
 /**
  * Turn any element into a drag source.
  *
- * Registration is split across a ref callback and an effect, and the split is load-bearing.
+ * Registration is deliberately split in two, and both halves exist to avoid cancelling a live
+ * drag (`internal/store.ts` cancels when a registered node disappears — `ANALYSIS.md` § A6):
  *
- * The **ref callback** carries the node: it registers whatever element it is handed, and never
- * unregisters. The **effect**, keyed on `[store, id]` alone, owns the registration's *lifetime*
- * — its cleanup is the only thing that unregisters, and it fires only on unmount or an id
- * change.
- *
- * Both halves exist to avoid a cancelled drag, from two different directions. An effect with
- * `data` in its dependency array re-runs on the ordinary `data={{ index }}`, so a routine
- * parent re-render mid-drag would unregister the item — and under the A6 policy that cancels
- * the drag (`ANALYSIS.md` § A9.4). But unregistering from the ref *cleanup* is just as bad for
- * a different reason: a consumer writing `ref={(node) => { myRef.current = node; setNodeRef(node) }}`
- * hands React a new function every render, so React detaches and re-attaches the ref on every
- * re-render — including the per-move re-renders of the item currently being dragged. That
- * detach is not a row disappearing, and treating it as one cancels the drag on its first
- * pointermove.
+ * - the **ref callback** registers whatever node it is handed and *never* unregisters, because a
+ *   consumer writing `ref={(node) => { myRef.current = node; setNodeRef(node) }}` hands React a
+ *   new function every render, so React detaches and re-attaches on every render — including the
+ *   per-move ones of the row being dragged.
+ * - the **effect**, keyed on `[store, id]` alone, owns the registration's lifetime. Keying it on
+ *   `data` too would re-run it on an ordinary `data={{ index }}`, unregistering mid-drag on a
+ *   routine parent re-render (§ A9.4).
  */
 
 const NO_DATA: DndData = {}
@@ -42,13 +36,10 @@ export type UseDraggableOptions = {
   readonly data?: DndData
   readonly disabled?: boolean
   /**
-   * Subscribe to the live translate so the source element can move with the pointer.
+   * Subscribe to the live translate so the source element moves with the pointer. On by default.
    *
-   * On by default, because a draggable that does not move is a surprising default. Turn it
-   * **off** when a `DragOverlay` carries the motion instead and the source element stays put:
-   * tracking costs this component one render per pointermove, and not tracking costs it two
-   * renders for the entire drag. `useSortable` turns it off for exactly that reason — its
-   * translate comes from the memoised list projection instead.
+   * Tracking costs one render per pointermove; not tracking costs two renders for the whole drag.
+   * Turn it **off** when a `DragOverlay` carries the motion and the source stays put.
    */
   readonly trackTransform?: boolean
   /** Merged with the sensors' activators rather than replacing them. */
@@ -62,10 +53,8 @@ export type UseDraggableResult = {
   /** `null` unless this item is the one being dragged and `trackTransform` is on. */
   readonly transform: Translate | null
   /**
-   * `transform` and `touch-action` in one object — pass it straight to `style`.
-   *
-   * No `transition`: easing here would fight the pointer, and a plain draggable has no
-   * displaced neighbours to settle. `useSortable` is where a settle transition belongs.
+   * `transform` and `touch-action` in one object — pass it straight to `style`. No `transition`:
+   * easing would fight the pointer, and a plain draggable has no displaced neighbours to settle.
    */
   readonly style: DragNodeStyle
 }
@@ -83,9 +72,9 @@ export const useDraggable = (options: UseDraggableOptions): UseDraggableResult =
     [store, id],
   )
 
-  // Re-registers on setup as well as unregistering on cleanup, because StrictMode runs
-  // setup → cleanup → setup: without the re-register, the middle cleanup would leave a mounted
-  // draggable permanently unregistered.
+  // Registers on setup as well as unregistering on cleanup, because StrictMode runs
+  // setup → cleanup → setup and the middle cleanup would otherwise leave a mounted draggable
+  // unregistered for good.
   useEffect(() => {
     const node = nodeRef.current
     if (node !== null) store.registerDraggable(id, node)
@@ -94,9 +83,9 @@ export const useDraggable = (options: UseDraggableOptions): UseDraggableResult =
     }
   }, [store, id])
 
-  // Mutable options are pushed into the existing registry entry. The registries do not notify
-  // (perf invariant 5), so this costs no render and cannot cancel anything — which is what
-  // makes it safe to re-run on every render as an inline `data` object demands.
+  // Mutable options are patched into the existing entry. Registries never notify (perf invariant
+  // 5), so this costs no render and cancels nothing — which is what makes it safe to re-run as
+  // often as an inline `data` object demands.
   useEffect(() => {
     store.updateDraggable(id, { data: data ?? NO_DATA, disabled })
   }, [store, id, data, disabled])
@@ -110,8 +99,13 @@ export const useDraggable = (options: UseDraggableOptions): UseDraggableResult =
   return {
     setNodeRef,
     handleProps: buildDragHandleProps({
-      id,
-      store,
+      sensorContext: {
+        draggableId: id,
+        // What a sensor calls once it decides the gesture is a real drag — `pointer-sensor.ts`
+        // after its activation threshold, `keyboard-sensor.ts` on Space/Enter. It hands back a
+        // `DragSession`, or `null` when the store refuses (already dragging, or disabled).
+        beginDrag: (init) => store.beginDrag(id, init),
+      },
       sensors,
       instructionsId,
       draggableRoleDescription,

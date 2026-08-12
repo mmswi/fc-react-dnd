@@ -140,13 +140,11 @@ export const readMetrics = (element: Element): ScrollBoxMetrics => {
   // One batch of reads, no writes among them.
   const { top, left, width, height } = element.getBoundingClientRect()
 
-  // The root element's border box is measured from the top of the *document*, so a scrolled page
-  // reports a negative top — while pointers arrive as `clientX/clientY`, already relative to the
-  // viewport. Subtracting that negative top adds the scroll offset a second time, so a pointer
-  // resting mid-screen is read as sitting `scrollY` pixels lower than it is. Once that lands in
-  // the bottom edge band the page scrolls itself with the pointer nowhere near an edge, which is
-  // what "the scroll gets triggered" looks like on the second drag of a session. In viewport
-  // coordinates the viewport starts at the origin, by definition.
+  // The viewport is pinned to the origin because its border box is measured from the top of the
+  // *document* — a scrolled page reports a negative top, and pointers already arrive in viewport
+  // coordinates, so subtracting it would add the scroll offset a second time. A pointer resting
+  // mid-screen then reads as `scrollY` pixels lower, lands in the bottom edge band, and the page
+  // scrolls itself with the pointer nowhere near an edge.
   const box = isViewport(element)
     ? { top: 0, left: 0, width: element.clientWidth, height: element.clientHeight }
     : { top, left, width, height }
@@ -182,6 +180,8 @@ export const createAutoScroller = (store: DragStore): AutoScroller => {
     return { x: origin.pointer.x + translate.x, y: origin.pointer.y + translate.y }
   }
 
+  // Drives itself frame to frame and *polls* the store for the pointer — the store never calls
+  // in here. `dnd-provider.tsx` starts and stops the loop from a monitor on drag start and end.
   const step = (): void => {
     frame = null
     const pointer = livePointer()
@@ -192,14 +192,13 @@ export const createAutoScroller = (store: DragStore): AutoScroller => {
     const shouldScroll = intent.x !== 0 || intent.y !== 0
 
     if (shouldScroll) {
-      // From the offsets already read, not `+=`. A read-modify-write reads `scrollTop` *after*
-      // writing `scrollLeft`, which is a layout read interleaved with a layout write — every
-      // frame of every drag. All the reads happened above; these are only writes.
+      // From the offsets already read, not `+=`: a read-modify-write would read `scrollTop`
+      // *after* writing `scrollLeft`, interleaving a layout read with a layout write every frame
+      // of every drag. Everything above is reads; these two are only writes.
       container.scrollLeft = box.scrollLeft + intent.x
       container.scrollTop = box.scrollTop + intent.y
-      // Everything below the scroll just moved, so `over` computed against the cached rects is
-      // now wrong. This is the step naive autoscroll skips, and it is why the drop lands one
-      // row off after a scroll.
+      // Everything below the scroll just moved, so `over` computed against the cached rects is now
+      // wrong — skip this and the drop lands a row off after a scroll.
       store.markRectsDirty()
     }
 

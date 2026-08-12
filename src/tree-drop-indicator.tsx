@@ -8,26 +8,23 @@ import { TREE_INDICATOR_EDGES, type TreeDropProjection } from './tree.js'
 /**
  * Where the drop will land, drawn.
  *
- * Tree rows are measure-only and never move, so **without something like this a tree drag shows
- * nothing at all** — not row motion, not a gap opening, nothing. That is the deliberate
- * indicator-only model (`ANALYSIS.md` § A7), and it means the feedback is not optional
- * decoration; it is the whole interface.
+ * Tree rows are measure-only and never move, so **without this a tree drag shows nothing at all**
+ * — no row motion, no gap opening. The indicator-only model is deliberate (`ANALYSIS.md` § A7),
+ * which makes this feedback the whole interface rather than decoration. It reads
+ * `projection.indicator`, already resolved to a screen anchor by `tree.ts`, so no consumer has to
+ * derive one from the sibling-space `afterId`/`beforeId` (§ A10).
  *
- * This ships because the alternative is every consumer deriving a screen position from
- * `afterId`/`beforeId`, which are sibling-space and cannot be turned into one without knowing
- * that an `into` target's `beforeId` is its first child, and that an un-nest belongs below a
- * whole subtree. This repo's own demo got that wrong three separate times before
- * `projection.indicator` existed (§ A10). A component removes the derivation rather than
- * documenting it.
- *
- * **The one contract:** the element you attach `getRowProps(id).ref` to spans the full width of
- * the list, with depth shown as padding *inside* it. Rows are measured through that ref, so a
- * ref on an already-indented child would report a left edge that moves with depth and there
- * would be no fixed origin to indent from. Putting `handleProps` on an inner button while the
- * ref sits on the full-width row is fine, and is what the playground does.
+ * **The one contract:** the element carrying `getRowProps(id).ref` spans the full width of the
+ * list, with depth as padding *inside* it. Rows are measured through that ref, so a ref on an
+ * already-indented child reports a left edge that moves with depth and leaves no fixed origin to
+ * indent from. `handleProps` on an inner button is fine, and is what the playground does.
  */
 
 const LINE_THICKNESS_PX = 2
+const INDICATOR_COLOR = '#2563eb'
+/** The same blue, as the fill of the `over` box. */
+const INDICATOR_FILL_COLOR = 'rgba(37, 99, 235, 0.12)'
+const OVER_OUTLINE = `2px solid ${INDICATOR_COLOR}`
 
 export type TreeDropIndicatorProps = {
   /** Straight from `useTreeDrop`. `null` renders nothing — including the no-legal-position case. */
@@ -78,8 +75,8 @@ export const TreeDropIndicator = ({
             ? anchorRect.top + anchorRect.height
             : anchorRect.top,
         height: isOver ? anchorRect.height : LINE_THICKNESS_PX,
-        background: isOver ? 'rgba(37, 99, 235, 0.12)' : '#2563eb',
-        outline: isOver ? '2px solid #2563eb' : undefined,
+        background: isOver ? INDICATOR_FILL_COLOR : INDICATOR_COLOR,
+        outline: isOver ? OVER_OUTLINE : undefined,
         ...style,
       }}
       {...rest}

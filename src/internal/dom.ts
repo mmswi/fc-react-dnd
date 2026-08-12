@@ -15,13 +15,11 @@ const NO_TRANSLATION: Translate = { x: 0, y: 0 }
 /**
  * The translation baked into a computed `transform`.
  *
- * Two shapes, because two environments disagree: a browser resolves everything to `matrix()` or
- * `matrix3d()`, while jsdom hands back whatever was written — `translate3d(0px, 120px, 0px)`.
- * Handling only the matrix forms would make this correction silently do nothing in the exact
- * environment the rest of the geometry is tested in.
+ * Both shapes are handled because the two environments disagree: a browser resolves everything to
+ * `matrix()`/`matrix3d()`, while jsdom hands back whatever was written. Matching only the matrix
+ * forms would make this silently do nothing in the environment the geometry is tested in.
  *
- * Parsed rather than handed to `DOMMatrixReadOnly`, which jsdom does not implement, and which
- * would drag a DOM interface into a pure function for no gain.
+ * Parsed by hand rather than through `DOMMatrixReadOnly`, which jsdom does not implement.
  */
 export const translationOfTransform = (transform: string): Translate => {
   const matrix = transform.match(/^matrix(3d)?\(([^)]+)\)$/)
@@ -48,14 +46,11 @@ const finiteTranslation = (x: number | undefined, y: number | undefined): Transl
 /**
  * Where the element **rests**, not where it currently appears.
  *
- * `getBoundingClientRect` reports the *visual* box, transform included — and this library asks
- * consumers to animate rows with `transform`. So a drag begun while the previous drop's
- * transition is still running would measure every row mid-flight and build the whole projection
- * on geometry that is about to stop being true. The symptom is the second drag of a session
- * displacing the wrong rows, which reads as "it worked once and then broke".
- *
- * Subtracting the element's own translation gives the layout position the transform is measured
- * *from*, which is the stable thing the projection needs.
+ * We subtract the element's own translation because `getBoundingClientRect` reports the visual
+ * box, transform included, and this library asks consumers to animate rows with `transform`. A
+ * drag begun while the previous drop's transition is still running would otherwise measure every
+ * row mid-flight and build the projection on geometry that is about to stop being true — the
+ * second drag of a session displacing the wrong rows.
  */
 export const readElementRect = (element: HTMLElement): Rect => {
   const { top, left, width, height } = element.getBoundingClientRect()

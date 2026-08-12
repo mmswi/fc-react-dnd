@@ -45,15 +45,11 @@ type CacheEntry = {
 }
 
 /**
- * Two levels, and both are load-bearing.
- *
- * The **outer** key is the per-provider store state object — never consumer data. This map is
- * module-level, so an identity shared between two `DndProvider`s would make them overwrite each
- * other's entry: last writer wins, and the symptom is a wrong projection in whichever provider
- * rendered second. That is exactly the slate-react `NODE_TO_PARENT` bug (`ANALYSIS.md` § A5).
- *
- * The **inner** key is the list's own `itemIds` array, because two `SortableList`s inside one
- * provider share a single state object and must not share a projection.
+ * Both keys are load-bearing. Outer: the per-provider state object, never consumer data — this
+ * cache is module-level, so an identity two `DndProvider`s shared would let them overwrite each
+ * other's entry, the slate-react `NODE_TO_PARENT` bug (`ANALYSIS.md` § A5). Inner: the list's own
+ * `itemIds`, because two `SortableList`s in one provider share a state object and must not share
+ * a projection.
  */
 const projectionCache = new WeakMap<DragStoreState, WeakMap<object, CacheEntry>>()
 

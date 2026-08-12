@@ -37,16 +37,13 @@ const DEFAULT_INSTRUCTIONS =
 const DEFAULT_ROLE_DESCRIPTION = 'draggable'
 
 /**
- * Both sensors, constructed once at module level so the default is referentially stable for
- * every consumer who does not customise it.
+ * Both sensors, constructed once at module level so the default is referentially stable for every
+ * consumer who does not customise it. Defaulting costs this module an import of both sensors —
+ * bundle size is explicitly not a concern here, and a provider that silently does nothing until
+ * you discover the `sensors` prop is the worse trade (`ANALYSIS.md` § A9.5).
  *
- * Defaulting means this module imports both sensors, which a bundle-size-sensitive library
- * would refuse. Bundle size is explicitly not a concern here, and a provider that silently does
- * nothing until you discover the `sensors` prop is the worse trade (`ANALYSIS.md` § A9.5).
- *
- * A consumer who *does* pass `sensors` owns keeping that array stable — an inline literal
- * re-renders the whole subtree on every parent render, because the context value depends on it
- * (§ A3.5).
+ * A consumer who *does* pass `sensors` owns keeping that array stable: the context value depends
+ * on it, so an inline literal re-renders the whole subtree on every parent render (§ A3.5).
  */
 const DEFAULT_SENSORS: readonly Sensor[] = Object.freeze([pointerSensor(), keyboardSensor()])
 
@@ -134,13 +131,12 @@ export const DndProvider = ({
   }, [store, autoScroller, autoScroll])
 
   /**
-   * Rects go stale when the page moves under a drag, and the pointer may not move at all while
-   * it happens — a scrolling container, a resized window, a sticky header collapsing. Without
-   * this the drop lands against geometry from before the scroll.
+   * Rects go stale when the page moves under a drag and the pointer never moves — a scrolling
+   * container, a resized window, a sticky header collapsing — and the drop would then land
+   * against geometry from before the scroll.
    *
-   * Listeners exist only for the duration of a drag: a capture-phase `scroll` hears scrolling in
-   * *any* container rather than only the window's, and both are passive because neither handler
-   * calls `preventDefault`.
+   * The listeners live only for the duration of a drag. Capture-phase, so `scroll` is heard from
+   * *any* container rather than only the window's; passive, since neither calls `preventDefault`.
    */
   useEffect(() => {
     const markRectsDirty = () => store.markRectsDirty()
