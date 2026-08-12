@@ -129,7 +129,7 @@ export type TreeIndicatorEdge = (typeof TREE_INDICATOR_EDGES)[keyof typeof TREE_
  * neighbour ids at all. This repo's own demo got it wrong three times before the projection
  * started answering the question itself.
  */
-export type TreeDropIndicator = {
+export type TreeDropIndicatorType = {
   /** The visible row to anchor against; `null` only when the tree has no visible rows. */
   readonly rowId: DndId | null
   readonly edge: TreeIndicatorEdge
@@ -153,7 +153,7 @@ export type TreeDropProjection = {
   readonly afterId: DndId | null
   /** The sibling it lands before; `null` at the end of the sibling list. */
   readonly beforeId: DndId | null
-  readonly indicator: TreeDropIndicator
+  readonly indicator: TreeDropIndicatorType
 }
 
 export type ProjectTreeDropArgs = {

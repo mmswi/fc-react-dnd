@@ -16,9 +16,10 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { DndProvider } from 'fc-react-dnd/dnd-provider'
+import { applySortEnd } from 'fc-react-dnd/list'
 import { SortableList, type SortEndEvent } from 'fc-react-dnd/sortable-list'
 import { useSortable } from 'fc-react-dnd/use-sortable'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { CommitBadge, ProfiledRow, useCommitCounter } from './render-counter.js'
 import { listStyle, panelStyle, rowStyle } from './theme.js'
 
@@ -81,21 +82,17 @@ const DndKitRow = ({ id }: { id: string }) => {
 }
 
 const OurList = () => {
-  const [ids, setIds] = useState(INITIAL_IDS)
-  const items = useMemo(() => ids, [ids])
+  // Ids straight from state — already referentially stable, so there is nothing to memoise.
+  const [ids, setIds] = useState<readonly string[]>(INITIAL_IDS)
 
+  // The array holds the ids themselves, so an item *is* its id.
   const handleSortEnd = useCallback((event: SortEndEvent) => {
-    setIds((current) => {
-      const next = [...current]
-      const [moved] = next.splice(event.fromIndex, 1)
-      if (moved) next.splice(event.toIndex, 0, moved)
-      return next
-    })
+    setIds((current) => applySortEnd(current, event, (id) => id))
   }, [])
 
   return (
     <DndProvider>
-      <SortableList items={items} onSortEnd={handleSortEnd}>
+      <SortableList items={ids} onSortEnd={handleSortEnd}>
         <ul style={listStyle}>
           {ids.map((id) => (
             <ProfiledRow key={id} id={`ours:${id}`}>

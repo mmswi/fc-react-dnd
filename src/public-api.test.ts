@@ -4,6 +4,7 @@ import * as collision from './collision.js'
 import * as dndProvider from './dnd-provider.js'
 import * as dragOverlay from './drag-overlay.js'
 import * as keyboardSensor from './keyboard-sensor.js'
+import * as list from './list.js'
 import * as pointerSensor from './pointer-sensor.js'
 import * as sortableList from './sortable-list.js'
 import * as tree from './tree.js'
@@ -35,6 +36,7 @@ const RUNTIME_EXPORTS_BY_SUBPATH: Readonly<Record<string, readonly string[]>> = 
   './dnd-provider': ['DndProvider'],
   './drag-overlay': ['DragOverlay'],
   './keyboard-sensor': ['keyboardSensor'],
+  './list': ['applySortEnd'],
   './pointer-sensor': ['pointerSensor'],
   './sortable-list': ['SortableList'],
   './tree': [
@@ -61,6 +63,7 @@ const MODULES_BY_SUBPATH: Readonly<Record<string, object>> = {
   './dnd-provider': dndProvider,
   './drag-overlay': dragOverlay,
   './keyboard-sensor': keyboardSensor,
+  './list': list,
   './pointer-sensor': pointerSensor,
   './sortable-list': sortableList,
   './tree': tree,
@@ -135,7 +138,7 @@ type PublishedTypeSurface = {
     | tree.TreeDropMode
     | tree.TreeNestPredicate
     | tree.TreeIndicatorEdge
-    | tree.TreeDropIndicator
+    | tree.TreeDropIndicatorType
     | tree.TreeDropProjection
     | tree.ProjectTreeDropArgs
   treeDropIndicator: treeDropIndicator.TreeDropIndicatorProps

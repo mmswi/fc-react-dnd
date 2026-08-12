@@ -22,6 +22,10 @@
       "types": "./dist/collision.d.ts",
       "default": "./dist/collision.js"
     },
+    "./list": {
+      "types": "./dist/list.d.ts",
+      "default": "./dist/list.js"
+    },
     "./dnd-provider": {
       "types": "./dist/dnd-provider.d.ts",
       "default": "./dist/dnd-provider.js"
