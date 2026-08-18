@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "A React drag-and-drop library with first-class tree support: drop-into vs drop-between, depth projection, and cycle prevention as pure functions.",
   "license": "MIT",
-  "author": "Mihai Marinescu",
+  "author": "Mihai Marinescu - featuringcode",
   "type": "module",
   "sideEffects": false,
   "files": [
