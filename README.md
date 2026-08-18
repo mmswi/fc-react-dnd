@@ -17,8 +17,8 @@ to work out what that means for your data. This one returns the answer:
 A position, clamped against both neighbours, with the dragged subtree removed from the maths so a
 cycle is never *offered* rather than being offered and then rejected.
 
-**Requirements: React 19 or newer, ESM only.** No CommonJS build, no bundler in the chain, zero
-runtime dependencies.
+**Requirements: React 19 or newer, Node 22 or newer, ESM only.** No CommonJS build, no bundler in
+the chain, zero runtime dependencies.
 
 ---
 
@@ -32,25 +32,26 @@ npm install fc-react-dnd
 19 is the only version this library is tested against, so claiming 18 would be a lie in the
 manifest. It may well work on 18 — we don't claim it, test it, or document it.
 
-## There is no root entry, on purpose
+## Importing
+
+Everything comes from the root, and every module is also its own subpath:
 
 ```ts
-import { useDraggable } from 'fc-react-dnd'            // ✗ does not resolve, and never will
-import { useDraggable } from 'fc-react-dnd/use-draggable' // ✓
+import { DndProvider, useSortable, applySortEnd } from 'fc-react-dnd'  // ✓ the usual way
+import { useDraggable } from 'fc-react-dnd/use-draggable'              // ✓ also fine
 ```
 
-Every public module is its own subpath. A barrel file pulls the whole library into your module
-graph the moment you import one thing from it, and defeats tree-shaking for everyone downstream.
-Deep imports into internals don't resolve either — `fc-react-dnd/internal/store` fails at
+Pick whichever reads better — importing from the root costs you nothing. The package is ESM-only
+and marked `sideEffects: false`, so your bundler drops everything you don't use.
+
+Internals stay unreachable from either direction — `fc-react-dnd/internal/store` fails at
 resolution time, not in review.
 
 ## Quickstart
 
 ```tsx
-import { DndProvider } from 'fc-react-dnd/dnd-provider'
-import { SortableList } from 'fc-react-dnd/sortable-list'
-import { useSortable } from 'fc-react-dnd/use-sortable'
-import { useMemo, useState } from 'react'
+import { applySortEnd, DndProvider, SortableList, useSortable } from 'fc-react-dnd'
+import { useState } from 'react'
 
 const Row = ({ id }: { id: string }) => {
   const { setNodeRef, handleProps, isDragging, style } = useSortable({ id })
@@ -63,22 +64,16 @@ const Row = ({ id }: { id: string }) => {
 }
 
 export const TaskList = () => {
-  const [items, setItems] = useState(['write', 'review', 'ship'])
-  // Referentially stable unless the order actually changes — see "Consumer contracts".
-  const itemIds = useMemo(() => items, [items])
+  // Ids straight from state, so this array keeps its identity until the order changes.
+  // `readonly` because that is what `applySortEnd` hands back — the same shape `applyTreeDrop` uses.
+  const [items, setItems] = useState<readonly string[]>(['write', 'review', 'ship'])
 
   return (
     <DndProvider>
       <SortableList
-        items={itemIds}
-        onSortEnd={({ fromIndex, toIndex }) =>
-          setItems((current) => {
-            const next = [...current]
-            const [moved] = next.splice(fromIndex, 1)
-            if (moved) next.splice(toIndex, 0, moved)
-            return next
-          })
-        }
+        items={items}
+        // The array holds the ids themselves, so an item *is* its id.
+        onSortEnd={(event) => setItems((current) => applySortEnd(current, event, (id) => id))}
       >
         <ul>
           {items.map((id) => (
@@ -93,6 +88,74 @@ export const TaskList = () => {
 
 Pointer and keyboard both work out of the box. `DndProvider` defaults `sensors` to
 `[pointerSensor(), keyboardSensor()]`.
+
+### When your state holds objects
+
+Which it usually does. `SortableList` wants ids, so derive them — and derive them **once**:
+
+```tsx
+import { applySortEnd, DndProvider, SortableList, useSortable } from 'fc-react-dnd'
+import { useMemo, useState } from 'react'
+
+type Task = { id: string; title: string }
+
+const INITIAL_TASKS: readonly Task[] = [
+  { id: 'write', title: 'Write the post' },
+  { id: 'review', title: 'Review it' },
+  { id: 'ship', title: 'Ship it' },
+]
+
+const Row = ({ task }: { task: Task }) => {
+  const { setNodeRef, handleProps, isDragging, style } = useSortable({ id: task.id })
+
+  return (
+    <li ref={setNodeRef} {...handleProps} style={{ ...style, opacity: isDragging ? 0.4 : 1 }}>
+      {task.title}
+    </li>
+  )
+}
+
+export const TaskBoard = () => {
+  const [tasks, setTasks] = useState<readonly Task[]>(INITIAL_TASKS)
+
+  // The line that matters. Rebuilt only when `tasks` is replaced — which is what makes it a
+  // memo, unlike `useMemo(() => tasks, [tasks])`, which hands back the array it was given.
+  const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks])
+
+  return (
+    <DndProvider>
+      <SortableList
+        items={taskIds}
+        onSortEnd={(event) =>
+          setTasks((current) => applySortEnd(current, event, (task) => task.id))
+        }
+      >
+        <ul>
+          {tasks.map((task) => (
+            <Row key={task.id} task={task} />
+          ))}
+        </ul>
+      </SortableList>
+    </DndProvider>
+  )
+}
+```
+
+`applySortEnd` is the list counterpart of `applyTreeDrop`: pure, and it resolves the landing slot
+from `afterId`/`beforeId` **against the array you hand it**, falling back to the captured index
+only when both neighbours have gone. Applied inside the updater like this, `current` is whatever
+React has queued now — so a sibling removed mid-drag lands your item next to the neighbour you
+meant instead of at a stale index. It also returns the *same array reference* when the drop changed
+nothing, and React skips a state update that sets the value it already had — so a drop that moves
+nothing re-renders nothing, without you checking for it.
+
+Inlining that map — `items={tasks.map((task) => task.id)}` — is the one mistake that costs you
+frames. `items` keys the projection memo, so a fresh array every render means the projection is
+recomputed **once per row per pointermove** instead of once per move. Nothing errors and no test
+goes red; the drag just gets heavy as the list grows.
+
+`useTreeDrop` has no equivalent step — it takes your `TreeItem` objects directly, so the array in
+state *is* the one you pass.
 
 ### `style` is the whole thing, and you should pass it
 
@@ -128,6 +191,64 @@ useSortable({ id, transition: null })
 
 `translate` and `transition` stay exposed for driving your own animation.
 
+## Anything that isn't a list
+
+A sortable list is one arrangement of two primitives. `useDraggable` makes an element a source,
+`useDroppable` makes one a target, and neither knows anything about ordering — which is what you want for "drag this card onto that bin".
+
+```tsx
+import { DndProvider, useDraggable, useDroppable } from 'fc-react-dnd'
+import { useState } from 'react'
+
+const BIN_ID = 'bin'
+
+const Card = ({ id, label }: { id: string; label: string }) => {
+  // Whatever you put in `data` rides along to every event as `active.data`.
+  const { setNodeRef, handleProps, isDragging, style } = useDraggable({ id, data: { label } })
+
+  return (
+    <div ref={setNodeRef} {...handleProps} style={{ ...style, opacity: isDragging ? 0.4 : 1 }}>
+      {label}
+    </div>
+  )
+}
+
+const Bin = () => {
+  const { setNodeRef, isOver } = useDroppable({ id: BIN_ID })
+
+  return (
+    <div ref={setNodeRef} style={{ background: isOver ? '#eef' : '#fff' }}>
+      Drop here
+    </div>
+  )
+}
+
+export const Desk = () => {
+  const [filed, setFiled] = useState<readonly string[]>([])
+
+  return (
+    <DndProvider
+      onDragEnd={({ active, over }) => {
+        if (over?.id === BIN_ID) setFiled((current) => [...current, String(active.data.label)])
+      }}
+    >
+      <Card id="invoice" label="Invoice" />
+      <Bin />
+      <ul>
+        {filed.map((label) => (
+          <li key={label}>{label}</li>
+        ))}
+      </ul>
+    </DndProvider>
+  )
+}
+```
+
+`data` is a `Record<string, unknown>` carried unchanged from the draggable or droppable to every
+event — it is how you get from an id back to your own object without a lookup table. It is
+deliberately not typed further: this library never inspects it, and typing it would mean typing
+your domain.
+
 ---
 
 ## Trees
@@ -145,12 +266,16 @@ careless implementation will happily drop a node inside its own subtree.
 ### The answer
 
 ```tsx
-import { DndProvider } from 'fc-react-dnd/dnd-provider'
-import { DragOverlay } from 'fc-react-dnd/drag-overlay'
-import { applyTreeDrop, flattenTree, type TreeItem } from 'fc-react-dnd/tree'
-import { useActiveDrag } from 'fc-react-dnd/use-active-drag'
-import { useDndMonitor } from 'fc-react-dnd/use-dnd-monitor'
-import { useTreeDrop } from 'fc-react-dnd/use-tree-drop'
+import {
+  applyTreeDrop,
+  DndProvider,
+  DragOverlay,
+  flattenTree,
+  type TreeItem,
+  useActiveDrag,
+  useDndMonitor,
+  useTreeDrop,
+} from 'fc-react-dnd'
 import { useMemo, useState } from 'react'
 
 type Doc = { title: string }
@@ -189,7 +314,6 @@ const Tree = () => {
               role="treeitem"
               aria-level={row.depth + 1}
               aria-posinset={row.index + 1}
-              aria-setsize={rows.filter((sibling) => sibling.parentId === row.parentId).length}
               // The line is positioned against this row, so nothing here needs to know a row
               // height or share a positioned ancestor with the rest of the list.
               style={{
@@ -235,6 +359,26 @@ const TreeDragPreview = () => {
 }
 ```
 
+### The two `aria-` attributes on each row
+
+They are what make a **flat list of `<li>`s** read as a tree. Once you write `role="tree"`, the
+browser stops inferring structure from your markup — and here there is none to infer anyway: every
+row is a sibling in one `<ul>`, so nothing in the DOM says "Onboarding" sits inside "Handbook".
+`flattenTree` has already worked out both numbers that do say it:
+
+| Attribute | From | What it tells a screen reader |
+| --- | --- | --- |
+| `aria-level` | `row.depth + 1` | How deep the row sits. `+1` because ARIA counts levels from 1 and `depth` counts from 0. |
+| `aria-posinset` | `row.index + 1` | Which child it is **of its own parent**. `TreeRow.index` is the sibling index, not the row's position on screen — the row 7th from the top can be `aria-posinset={2}`. Also 1-based. |
+
+A screen reader then reads a row as roughly *"Onboarding, level 2, item 1"*. Leave them out and it
+falls back to the flattened list — position among every visible row, and no depth at all — which is
+a flat list, while a sighted user is looking at a hierarchy.
+
+**If you add collapsing**, rows with children also need `aria-expanded={!collapsedIds.has(row.id)}`
+— without it a screen reader cannot tell a leaf from a closed branch, or say that opening one is
+possible. The example above has no collapse state, so it has no `aria-expanded`.
+
 **Tree rows do not move during a drag, so nothing is visible unless you render it.** That is
 deliberate — rows are measure-only, and translating them would move the very geometry the
 projection is computed from — but it means a tree wired up without the two pieces above feels
@@ -273,16 +417,17 @@ Hide the indicator; a release there moves nothing.
   children has two bands and no middle.
 - **Depth from horizontal position**, in `indentPx` steps. You cannot go deeper than one level
   inside the row above, and that bound obeys `canNest`, because one level inside a row *is*
-  nesting into it. Going shallower is where most tree implementations trap you — see below.
-- **Dragging left lifts a row out of its parent**, from anywhere in a group. The clamp everyone
-  quotes — `[next.depth, prev.depth + 1]` — makes un-nesting nearly unreachable, because every
-  row bounding a gap *inside* a group sits at that group's depth or deeper, so the lower bound
-  can never offer a way out. You end up having to shuffle a row to the bottom of its parent
-  before you are allowed to lift it. Here, a deliberate leftward pull drops the floor to the
-  root: one step left makes the row a sibling of its parent, another a sibling of its
-  grandparent. It lands *after* that ancestor's whole subtree, because a row cannot sit at the
-  parent's level between that parent's children — coming out of a group is a downward move. A
-  drag with no horizontal intent still joins the group it was aimed at.
+  nesting into it. Going shallower is the harder direction, and it is the one this library's own
+  first implementation got wrong — see below.
+- **Dragging left lifts a row out of its parent**, from anywhere in a group. The obvious depth
+  clamp — `[next.depth, prev.depth + 1]`, which this library shipped first — makes un-nesting
+  nearly unreachable, because every row bounding a gap *inside* a group sits at that group's
+  depth or deeper, so the lower bound can never offer a way out. You end up having to shuffle a
+  row to the bottom of its parent before you are allowed to lift it. Here, a deliberate leftward
+  pull drops the floor to the root: one step left makes the row a sibling of its parent, another
+  a sibling of its grandparent. It lands *after* that ancestor's whole subtree, because a row
+  cannot sit at the parent's level between that parent's children — coming out of a group is a
+  downward move. A drag with no horizontal intent still joins the group it was aimed at.
 - **Cycles are unrepresentable.** The dragged node and its whole subtree are removed from the
   rows the maths runs over, so "inside your own child" is never a position the projection can
   produce. There is still a defensive guard in `applyTreeDrop` for a hand-built projection, and
@@ -290,9 +435,7 @@ Hide the indicator; a release there moves nothing.
 - **Any node can be a parent.** There is no "folder" kind. A document you drop something onto
   gains a `children` array; when its last child leaves, `children: []` stays behind rather than
   vanishing, so an expander rendered off `children !== undefined` doesn't flicker.
-- **Structural sharing.** `applyTreeDrop` rebuilds only the two ancestor spines it has to. Every
-  subtree that didn't change keeps its identity, so your `memo`'d rows bail out after a drop. A
-  deep clone would be *correct* and would re-render all 10,000 rows of a 10,000-node tree.
+- **Structural sharing.** A drop rebuilds a handful of nodes, not the entire tree — see below.
 - **The position survives a concurrent edit.** The projection carries `afterId`/`beforeId`
   alongside `index`, and `applyTreeDrop` resolves the final slot against the tree you hand it. If
   a collaborator removed a sibling above the insertion point mid-drag, the item still lands next
@@ -304,6 +447,31 @@ Hide the indicator; a release there moves nothing.
   has no neighbour ids at all, and an un-nest belongs below a whole subtree. This library's own
   demo got it wrong three times before the projection started answering it.
 
+### Structural sharing — a drop rebuilds a handful of nodes, not the tree
+
+`applyTreeDrop` hands back a new tree, but **nearly every node in it is the same object you passed
+in.** The only ones rebuilt are the two ancestor spines it had to touch: from the root down to
+where the row left, and from the root down to where it landed. The moved node keeps its identity,
+and so does every subtree on either side of those spines. A drop therefore allocates about
+`2 × depth` nodes and copies nothing else — the same handful whether the tree has three nodes or
+ten thousand.
+
+A deep clone throws that away. `structuredClone`, a JSON round-trip, or any recursive copy — in your
+`onDragEnd`, or anywhere the returned tree passes through — gives you one that is right in every
+value and **new in every reference**, so the drop pays to copy every node instead. It looks correct,
+which is why it survives review; you notice when the tree grows and drops start to stutter.
+
+Because that broken version is invisible until it isn't, the sharing is pinned by tests rather than
+by intention: untouched nodes must come back identical (`toBe`) to the ones passed in, the rebuilt
+ancestors must not, the input array is asserted unmutated, and a drop that changes nothing returns
+the very array you handed in.
+
+On a very large tree the preserved identity doubles as a render lever. `useTreeDrop` lives in the
+parent, so a projection change re-renders the whole visible list — and because untouched nodes keep
+their reference, wrapping rows in `memo` lets them bail out of that. You don't reach for it at normal
+sizes: a projection changes only when the drop crosses a band or its depth, not on every pointermove,
+so re-rendering a screenful of rows that rarely is already cheap — neither demo memoises anything.
+
 ### The maths is usable on its own
 
 `fc-react-dnd/tree` is pure: no React, no DOM, no `'use client'`. `flattenTree`,
@@ -313,6 +481,9 @@ against them without rendering anything.
 ---
 
 ## API
+
+Everything below is also exported from the root, `fc-react-dnd`. The subpaths remain the way to
+reach a single module without instantiating the rest — see *Importing*.
 
 | Subpath | Exports |
 | --- | --- |
@@ -325,9 +496,10 @@ against them without rendering anything.
 | `fc-react-dnd/pointer-sensor` | `pointerSensor`, `PointerSensorOptions` |
 | `fc-react-dnd/keyboard-sensor` | `keyboardSensor`, `KeyboardSensorOptions` |
 | `fc-react-dnd/collision` | `closestCenter` |
+| `fc-react-dnd/list` | `applySortEnd` |
 | `fc-react-dnd/sortable-list` | `SortableList`, `SortableListProps`, `SortEndEvent` |
 | `fc-react-dnd/use-sortable` | `useSortable`, `UseSortableOptions`, `UseSortableResult`, `SORTABLE_SETTLE_TRANSITION` |
-| `fc-react-dnd/tree` | `TreeItem`, `TreeRow`, `FlattenedTree`, `FlattenTreeOptions`, `flattenTree`, `TREE_DROP_MODES`, `TreeDropMode`, `TreeNestPredicate`, `TreeDropProjection`, `TREE_INDICATOR_EDGES`, `TreeIndicatorEdge`, `TreeDropIndicator`, `ProjectTreeDropArgs`, `DEFAULT_TREE_INDENT_PX`, `DEFAULT_NEST_BAND_FRACTION`, `projectTreeDrop`, `applyTreeDrop` |
+| `fc-react-dnd/tree` | `TreeItem`, `TreeRow`, `FlattenedTree`, `FlattenTreeOptions`, `flattenTree`, `TREE_DROP_MODES`, `TreeDropMode`, `TreeNestPredicate`, `TreeDropProjection`, `TREE_INDICATOR_EDGES`, `TreeIndicatorEdge`, `TreeDropIndicatorType`, `ProjectTreeDropArgs`, `DEFAULT_TREE_INDENT_PX`, `DEFAULT_NEST_BAND_FRACTION`, `projectTreeDrop`, `applyTreeDrop` |
 | `fc-react-dnd/use-tree-drop` | `useTreeDrop`, `UseTreeDropOptions`, `UseTreeDropResult`, `TreeRowProps` |
 | `fc-react-dnd/tree-drop-indicator` | `TreeDropIndicator`, `TreeDropIndicatorProps` |
 | `fc-react-dnd/types` | `DndId`, `Point`, `Translate`, `Rect`, `DndData`, `DragNodeStyle`, `DRAG_CANCEL_REASONS`, `DragCancelReason`, `DRAG_DIRECTIONS`, `DragDirection`, `ActiveDragInfo`, `DragActive`, `DragOver`, `DragStartEvent`, `DragMoveEvent`, `DragOverEvent`, `DragEndEvent`, `DragCancelEvent`, `CollisionActive`, `DroppableCandidate`, `CollisionArgs`, `CollisionDetection`, `DirectionalTarget`, `DragSession`, `DragBeginInit`, `SensorContext`, `SensorActivatorProps`, `Sensor`, `DragHandleProps`, `DndAnnouncements`, `DndAccessibility`, `DndMonitorListeners` |
@@ -355,6 +527,65 @@ against them without rendering anything.
 | `'item-removed'` | **The library forced the cancel** because a registered node disappeared mid-drag |
 
 That last one deserves a branch of its own. See *Concurrent edits*, below.
+
+### `useDraggable(options)` · `useDroppable(options)`
+
+| Option | Default | |
+| --- | --- | --- |
+| `id` | | Required. `string \| number` |
+| `data` | `{}` | Carried unchanged to every event as `active.data` / `over.data` |
+| `disabled` | `false` | Keeps `aria-disabled` and every semantic; loses only activation |
+| `trackTransform` | `true` | `useDraggable` only. Off, the source stays put — for overlay-driven drags |
+| `activatorProps` | | `useDraggable` only. Your own `onPointerDown`/`onKeyDown`, merged *alongside* the sensors' rather than replacing them |
+
+`useDraggable` returns `{ setNodeRef, handleProps, isDragging, transform, style }`, `useDroppable`
+returns `{ setNodeRef, isOver }`.
+
+### `useSortable(options)`
+
+Takes `id`, `data` and `disabled` as above, plus:
+
+| Option | Default | |
+| --- | --- | --- |
+| `transition` | `SORTABLE_SETTLE_TRANSITION` | The easing a *displaced* row settles with. `null` turns it off |
+| `trackTransform` | `true` | Off, the row stays put and a `DragOverlay` carries the motion |
+
+Returns `{ setNodeRef, handleProps, isDragging, isOver, translate, transition, style }`. Must be
+called inside a `SortableList`.
+
+### `SortableList`
+
+| Prop | Default | |
+| --- | --- | --- |
+| `items` | | Required, and **referentially stable** — it keys the projection memo |
+| `direction` | `'vertical'` | `'horizontal'` measures and constrains along the x axis instead |
+| `id` | auto | Only needed if you want a stable one |
+| `onSortEnd` | | `{ activeId, fromIndex, toIndex, afterId, beforeId }`, and only when the order actually changed |
+
+A horizontal list drags and displaces along x. Keyboard depth-stepping is vertical-list shaped
+today — ArrowLeft/ArrowRight are the depth step — so a horizontal list's arrow keys are a known
+gap, not a supported path.
+
+### `useTreeDrop(options)`
+
+| Option | Default | |
+| --- | --- | --- |
+| `items` | | Required, and **referentially stable** — it keys the projection memo |
+| `collapsedIds` | | Ids whose children are hidden. Collapsed branches are still indexed, so a drop can still resolve against them; only their rows are withheld |
+| `indentPx` | `24` | One depth level, in pixels. The single place to say it — the keyboard sensor reads it from here |
+| `nestBandFraction` | `0.3` | Share of a nestable row's height given to the *before* and *after* gaps, each. The rest is the "drop inside" band |
+| `canNest` | any node can parent | `(candidateParent: TreeRow, active: TreeRow) => boolean`. Must be referentially stable |
+| `describeProjection` | | Overrides the live-region text as the projection moves |
+
+Returns `{ projection, getRowProps }`.
+
+`canNest` is the whole "this node refuses children" story — it gates the middle band *and* the
+`prev.depth + 1` bound, because one level inside a row is nesting into it:
+
+```tsx
+const canNest = useCallback((parent: TreeRow) => parent.id !== 'archive', [])
+useTreeDrop({ items, canNest })
+```
 
 ### `pointerSensor(options?)`
 
@@ -440,8 +671,9 @@ useTreeDrop({
 })
 ```
 
-Give rows `aria-level`, `aria-posinset` and `aria-setsize` from `flattenTree`'s output, as in the
-tree example above.
+Rows also need `aria-level` and `aria-posinset`, both of which come out of `flattenTree` — see
+*The two `aria-` attributes on each row* under the tree example, where they are shown in place and
+explained one by one.
 
 ---
 
@@ -458,7 +690,16 @@ warning.
 ```
 
 These arrays key the projection memo. An inline one recomputes the projection once per subscriber
-per pointermove instead of once per move — a green test suite and a dropped frame.
+per pointermove instead of once per move — a green test suite and a dropped frame. Deriving ids
+from objects in state is the case this bites; *When your state holds objects*, above, is the whole
+pattern.
+
+Two corollaries worth stating, because both look like the rule and are not:
+
+- A value **already stable in state needs no memo**. `useMemo(() => tasks, [tasks])` returns the
+  array it was handed, so it is exactly `tasks` — a no-op, not a stabiliser.
+- `canNest` is a function, so the same rule applies to it: `useCallback`, or define it at module
+  scope where it closes over nothing.
 
 **2. Restore collapse state after the drag, never during it.**
 
@@ -533,10 +774,10 @@ coalesced to at most one write per frame. Its children render **once** for a who
 
 Modules that touch React state, effects, context, or the DOM carry `'use client'`. These do not:
 
-`fc-react-dnd/types` · `fc-react-dnd/collision` · `fc-react-dnd/tree`
+`fc-react-dnd/types` · `fc-react-dnd/collision` · `fc-react-dnd/tree` · `fc-react-dnd/list`
 
-You can import tree types and run the tree maths in a server component. Everything else needs a
-client boundary.
+You can import tree types and run the tree and list maths in a server component. Everything else
+needs a client boundary.
 
 ## Scope
 

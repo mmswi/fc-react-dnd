@@ -3,7 +3,9 @@ import packageJson from '../package.json' with { type: 'json' }
 import * as collision from './collision.js'
 import * as dndProvider from './dnd-provider.js'
 import * as dragOverlay from './drag-overlay.js'
+import * as rootEntry from './index.js'
 import * as keyboardSensor from './keyboard-sensor.js'
+import * as list from './list.js'
 import * as pointerSensor from './pointer-sensor.js'
 import * as sortableList from './sortable-list.js'
 import * as tree from './tree.js'
@@ -31,10 +33,39 @@ import * as useTreeDrop from './use-tree-drop.js'
 const PACKAGE_JSON_SUBPATH = './package.json'
 
 const RUNTIME_EXPORTS_BY_SUBPATH: Readonly<Record<string, readonly string[]>> = {
+  // The root entry re-exports every subpath's value exports and nothing else, so this list is
+  // the whole published surface in one place — and adding an export anywhere fails here first.
+  '.': [
+    'DRAG_CANCEL_REASONS',
+    'DRAG_DIRECTIONS',
+    'DEFAULT_NEST_BAND_FRACTION',
+    'DEFAULT_TREE_INDENT_PX',
+    'DndProvider',
+    'DragOverlay',
+    'SORTABLE_SETTLE_TRANSITION',
+    'SortableList',
+    'TREE_DROP_MODES',
+    'TREE_INDICATOR_EDGES',
+    'TreeDropIndicator',
+    'applySortEnd',
+    'applyTreeDrop',
+    'closestCenter',
+    'flattenTree',
+    'keyboardSensor',
+    'pointerSensor',
+    'projectTreeDrop',
+    'useActiveDrag',
+    'useDndMonitor',
+    'useDraggable',
+    'useDroppable',
+    'useSortable',
+    'useTreeDrop',
+  ],
   './collision': ['closestCenter'],
   './dnd-provider': ['DndProvider'],
   './drag-overlay': ['DragOverlay'],
   './keyboard-sensor': ['keyboardSensor'],
+  './list': ['applySortEnd'],
   './pointer-sensor': ['pointerSensor'],
   './sortable-list': ['SortableList'],
   './tree': [
@@ -57,10 +88,12 @@ const RUNTIME_EXPORTS_BY_SUBPATH: Readonly<Record<string, readonly string[]>> = 
 }
 
 const MODULES_BY_SUBPATH: Readonly<Record<string, object>> = {
+  '.': rootEntry,
   './collision': collision,
   './dnd-provider': dndProvider,
   './drag-overlay': dragOverlay,
   './keyboard-sensor': keyboardSensor,
+  './list': list,
   './pointer-sensor': pointerSensor,
   './sortable-list': sortableList,
   './tree': tree,
@@ -135,7 +168,7 @@ type PublishedTypeSurface = {
     | tree.TreeDropMode
     | tree.TreeNestPredicate
     | tree.TreeIndicatorEdge
-    | tree.TreeDropIndicator
+    | tree.TreeDropIndicatorType
     | tree.TreeDropProjection
     | tree.ProjectTreeDropArgs
   treeDropIndicator: treeDropIndicator.TreeDropIndicatorProps

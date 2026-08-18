@@ -1,5 +1,6 @@
 import { DndProvider } from 'fc-react-dnd/dnd-provider'
 import { DragOverlay } from 'fc-react-dnd/drag-overlay'
+import { applySortEnd } from 'fc-react-dnd/list'
 import { SortableList, type SortEndEvent } from 'fc-react-dnd/sortable-list'
 import { useActiveDrag } from 'fc-react-dnd/use-active-drag'
 import { useSortable } from 'fc-react-dnd/use-sortable'
@@ -9,7 +10,11 @@ import { listStyle, panelStyle, rowStyle } from './theme.js'
 
 const ITEM_COUNT = 24
 
-const initialItems = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
+type Task = { id: string; title: string }
+
+// `readonly`, so `useState` infers it and `applySortEnd`'s result assigns straight back — the
+// same shape `applyTreeDrop` and the tree page already use.
+const initialItems: readonly Task[] = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
   id: `task-${index + 1}`,
   title: `Task ${index + 1}`,
 }))
@@ -80,12 +85,9 @@ export const SortablePage = () => {
 
   const handleSortEnd = useCallback((event: SortEndEvent) => {
     setLastSort(event)
-    setItems((current) => {
-      const next = [...current]
-      const [moved] = next.splice(event.fromIndex, 1)
-      if (moved) next.splice(event.toIndex, 0, moved)
-      return next
-    })
+    // Inside the updater, so `current` is whatever React has queued now rather than a snapshot
+    // taken when the drop happened — which is the point of resolving by id.
+    setItems((current) => applySortEnd(current, event, (item) => item.id))
   }, [])
 
   return (
@@ -139,6 +141,14 @@ export const SortablePage = () => {
           ? JSON.stringify(lastSort, null, 2)
           : 'onSortEnd fires here — including the id-relative landing position.'}
       </pre>
+      <p>
+        That event is applied by <code>applySortEnd(current, event, getId)</code> from{' '}
+        <code>fc-react-dnd/list</code> — a pure function that resolves the landing slot from{' '}
+        <code>afterId</code>/<code>beforeId</code> against the array you hand it, so a row removed
+        by something else mid-drag cannot land this one at a stale index. Drag a row, then compare
+        the ids above with the new order below.
+      </p>
+      <pre style={panelStyle}>{items.map((item) => item.id).join('\n')}</pre>
     </section>
   )
 }
