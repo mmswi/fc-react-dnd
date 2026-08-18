@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — 2026-08-18
+
+### Changed
+
+- Added `repository`, `homepage`, and `bugs` fields to the package manifest so the npm page links
+  back to the GitHub source. Metadata only — no code, build, or API change.
+
 ## [0.1.0] — 2026-08-08
 
 First release.
@@ -73,4 +80,5 @@ Cross-list and cross-tree moves, additional collision strategies, drop animation
 during a tree drag, RTL-aware direction, and a built-in auto-expand helper (the recipe is
 documented and demonstrated).
 
-[0.1.0]: https://github.com/mihaimarinescu/fc-react-dnd/releases/tag/v0.1.0
+[0.1.1]: https://github.com/mmswi/fc-react-dnd/releases/tag/v0.1.1
+[0.1.0]: https://github.com/mmswi/fc-react-dnd/releases/tag/v0.1.0
