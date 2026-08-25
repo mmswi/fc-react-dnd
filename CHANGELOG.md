@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — 2026-08-25
+
+### Changed
+
+- Repointed the `homepage` manifest field to the live demo
+  (https://fc-react-dnd-demo.vercel.app/) and linked the demo from the README. The GitHub source
+  stays reachable through the `repository` field. Docs and metadata only — no code, build, or API
+  change.
+
 ## [0.1.1] — 2026-08-18
 
 ### Changed
@@ -80,5 +89,6 @@ Cross-list and cross-tree moves, additional collision strategies, drop animation
 during a tree drag, RTL-aware direction, and a built-in auto-expand helper (the recipe is
 documented and demonstrated).
 
+[0.1.2]: https://github.com/mmswi/fc-react-dnd/releases/tag/v0.1.2
 [0.1.1]: https://github.com/mmswi/fc-react-dnd/releases/tag/v0.1.1
 [0.1.0]: https://github.com/mmswi/fc-react-dnd/releases/tag/v0.1.0

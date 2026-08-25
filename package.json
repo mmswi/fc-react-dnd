@@ -1,6 +1,6 @@
 {
   "name": "fc-react-dnd",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A React drag-and-drop library with first-class tree support: drop-into vs drop-between, depth projection, and cycle prevention as pure functions.",
   "license": "MIT",
   "author": "Mihai Marinescu - featuringcode",
