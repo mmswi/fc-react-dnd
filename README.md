@@ -2,6 +2,8 @@
 
 A React drag-and-drop library with **first-class tree support**.
 
+**[Try the live demo →](https://fc-react-dnd-demo.vercel.app/)**
+
 Every general-purpose React DnD library stops at the same boundary: it tells you what gesture you
 made relative to *one row* — "you are above this item", "you are in its middle" — and leaves you
 to work out what that means for your data. This one returns the answer:
